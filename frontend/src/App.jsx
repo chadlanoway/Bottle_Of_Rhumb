@@ -3,12 +3,13 @@ import Menu, { AppHeader, EditorToolbar } from './Menu.jsx';
 import FeatureEditor from './FeatureEditor.jsx';
 import { createMap, fitMapToFeatures, getMapView, previewMapView } from './map.js';
 import {
+  addGeoJSON,
   deleteSelected,
   deleteFeature,
   deleteLayerFeatures,
   exportGeoJSON,
-  importGeoJSON,
   previewFeaturePopup,
+  replaceGeoJSON,
   selectFeature,
   setHiddenLayers,
   setupDrawingTools,
@@ -23,6 +24,7 @@ export default function App() {
   const mapRef = useRef(null);
   const drawRef = useRef(null);
   const activeLayerIdRef = useRef(DEFAULT_LAYER.id);
+  const dragDepthRef = useRef(0);
   const [mapReady, setMapReady] = useState(false);
   const [features, setFeatures] = useState([]);
   const [layers, setLayers] = useState([DEFAULT_LAYER]);
@@ -31,6 +33,7 @@ export default function App() {
   const [savedView, setSavedView] = useState(null);
   const [viewMessage, setViewMessage] = useState('');
   const [error, setError] = useState('');
+  const [dragActive, setDragActive] = useState(false);
 
   activeLayerIdRef.current = activeLayerId;
 
@@ -68,16 +71,90 @@ export default function App() {
   async function handleImport(file) {
     try {
       setError('');
-      const collection = await importGeoJSON(
+      const collection = JSON.parse(await file.text());
+      const layerId = `layer-${crypto.randomUUID()}`;
+      const loaded = addGeoJSON(
         drawRef.current,
         mapRef.current,
-        file,
-        activeLayerId,
+        collection,
+        layerId,
       );
-      setFeatures(collection.features);
+      const name = file.name.replace(/\.(geojson|json)$/i, '') || 'Imported layer';
+      setLayers((current) => [...current, { id: layerId, name, visible: true }]);
+      setActiveLayerId(layerId);
+      setSelectedFeatureId(null);
+      setFeatures(loaded.features);
+      return { ok: true };
     } catch (caughtError) {
       setError(caughtError.message);
+      return { ok: false, error: caughtError.message };
     }
+  }
+
+  function handleApplyGeoJSON(collection) {
+    try {
+      setError('');
+      const loaded = replaceGeoJSON(
+        drawRef.current,
+        mapRef.current,
+        collection,
+        activeLayerId,
+      );
+      setFeatures(loaded.features);
+      setSelectedFeatureId(null);
+      addMissingLayers(loaded.features);
+      return { ok: true };
+    } catch (caughtError) {
+      setError(caughtError.message);
+      return { ok: false, error: caughtError.message };
+    }
+  }
+
+  function addMissingLayers(nextFeatures) {
+    setLayers((current) => {
+      const known = new Set(current.map((layer) => layer.id));
+      const missing = [];
+      for (const feature of nextFeatures) {
+        const id = feature.properties?.layerId ?? activeLayerId;
+        if (!known.has(id)) {
+          known.add(id);
+          missing.push({ id, name: `Imported layer ${missing.length + 1}`, visible: true });
+        }
+      }
+      return [...current, ...missing];
+    });
+  }
+
+  function handleDragEnter(event) {
+    if (!hasFileTransfer(event)) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragOver(event) {
+    if (!hasFileTransfer(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  function handleDragLeave(event) {
+    if (!hasFileTransfer(event)) return;
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragActive(false);
+  }
+
+  async function handleDrop(event) {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setDragActive(false);
+    const file = Array.from(event.dataTransfer.files).find(isGeoJSONFile);
+    if (!file) {
+      setError('Drop a .geojson or .json file to import it as a new layer.');
+      return;
+    }
+    await handleImport(file);
   }
 
   function handleAddLayer() {
@@ -179,7 +256,13 @@ export default function App() {
   );
 
   return (
-    <main className="app-shell">
+    <main
+      className={`app-shell ${dragActive ? 'is-dragging-file' : ''}`}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div ref={mapContainerRef} className="map-canvas" />
       <AppHeader />
       <EditorToolbar
@@ -202,6 +285,7 @@ export default function App() {
         onAddLayer={handleAddLayer}
         onExport={() => exportGeoJSON(drawRef.current)}
         onImport={handleImport}
+        onApplyGeoJSON={handleApplyGeoJSON}
         onClearView={handleClearView}
         onDeleteLayer={handleDeleteLayer}
         onLayerChange={setActiveLayerId}
@@ -221,6 +305,15 @@ export default function App() {
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
       />
 
+      {dragActive && (
+        <div className="geojson-drop-overlay" aria-hidden="true">
+          <div>
+            <strong>Drop GeoJSON to add a layer</strong>
+            <span>The existing map will be preserved.</span>
+          </div>
+        </div>
+      )}
+
       {!mapReady && !error && (
         <div className="loading-card" role="status">
           <div className="loading-compass">⌖</div>
@@ -236,4 +329,12 @@ export default function App() {
       )}
     </main>
   );
+}
+
+function hasFileTransfer(event) {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+}
+
+function isGeoJSONFile(file) {
+  return /\.(geojson|json)$/i.test(file.name);
 }

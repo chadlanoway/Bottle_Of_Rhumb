@@ -430,6 +430,46 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .secondary-button:hover:not(:disabled) { border-color: var(--blue); background: rgba(30,144,255,.18); }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.data-drop-help { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.geojson-editor {
+  width: 100%;
+  min-height: 280px;
+  padding: 9px;
+  resize: vertical;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  background: #091216;
+  color: #d9f0df;
+  font: 12px/1.45 Consolas, 'Courier New', monospace;
+  tab-size: 2;
+  white-space: pre;
+}
+.geojson-editor-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 7px; }
+.geojson-editor-actions button, .apply-geojson-button {
+  padding: 7px;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  background: rgba(255,255,255,.08);
+  color: white;
+  cursor: pointer;
+}
+.apply-geojson-button { width: 100%; margin-top: 7px; border-color: rgba(30,144,255,.65); background: rgba(30,144,255,.18); font-weight: 700; }
+.geojson-message { margin: 8px 0 0; color: var(--green); font-size: 12px; overflow-wrap: anywhere; }
+.geojson-message.is-error { color: #ffb4b4; }
+.geojson-drop-overlay {
+  position: absolute;
+  z-index: 60;
+  inset: calc(var(--header-height) + var(--toolbar-height)) 0 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  border: 4px dashed rgba(30,144,255,.85);
+  background: rgba(7,19,26,.62);
+  backdrop-filter: blur(2px);
+}
+.geojson-drop-overlay > div { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 20px 26px; border-radius: 9px; background: var(--panel); box-shadow: 0 16px 42px rgba(0,0,0,.45); }
+.geojson-drop-overlay strong { color: white; font-size: 22px; }
+.geojson-drop-overlay span { color: var(--muted); }
 button:disabled { cursor: not-allowed; opacity: .45; }
 .empty-section h2 { margin: 8px 0 4px; text-transform: capitalize; }
 .empty-section p { margin: 0; color: var(--muted); line-height: 1.45; }

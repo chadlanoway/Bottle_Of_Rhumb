@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FaGithub } from 'react-icons/fa';
 
 const DRAW_ACTIONS = [
@@ -7,6 +7,7 @@ const DRAW_ACTIONS = [
   { type: 'line', label: 'Line', icon: '╱' },
   { type: 'polygon', label: 'Polygon', icon: '⬡' },
   { type: 'text', label: 'Text', icon: 'T' },
+  { type: 'circle', label: 'Circle', icon: '○' },
 ];
 
 const geometryIcon = { Point: '●', LineString: '╱', Polygon: '⬡' };
@@ -18,16 +19,25 @@ export function AppHeader() {
         <span className="brand-mark" aria-hidden="true">⌖</span>
         <strong>Bottle of Rhumb</strong>
       </div>
+
       <nav className="header-actions" aria-label="Project links">
         <a
-          className="header-link is-placeholder"
-          href="#github"
-          onClick={(event) => event.preventDefault()}
-          title="Add the repository URL when it is ready"
+          className="header-link"
+          href="https://github.com/chadlanoway/Bottle_Of_Rhumb"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View Bottle of Rhumb on GitHub"
+          aria-label="View Bottle of Rhumb on GitHub"
         >
           <FaGithub aria-hidden="true" />
         </a>
-        <button className="donate-button" type="button" disabled title="Coming later">
+
+        <button
+          className="donate-button"
+          type="button"
+          disabled
+          title="Coming later"
+        >
           Donate
         </button>
       </nav>
@@ -88,6 +98,7 @@ export default function Menu({
   selectedFeatureId,
   viewMessage,
   onAddLayer,
+  onApplyGeoJSON,
   onClearView,
   onDeleteLayer,
   onExport,
@@ -156,20 +167,14 @@ export default function Menu({
           )}
 
           {activeSection === 'data' && (
-            <div className="menu-section">
-              <p className="section-label">GeoJSON</p>
-              <input
-                ref={fileInputRef}
-                className="visually-hidden"
-                type="file"
-                accept=".geojson,.json,application/geo+json,application/json"
-                onChange={handleFileChange}
-              />
-              <div className="button-row">
-                <button className="secondary-button" disabled={disabled} type="button" onClick={() => fileInputRef.current?.click()}>Import</button>
-                <button className="secondary-button" disabled={disabled || features.length === 0} type="button" onClick={onExport}>Export</button>
-              </div>
-            </div>
+            <DataSection
+              disabled={disabled}
+              features={features}
+              fileInputRef={fileInputRef}
+              onApplyGeoJSON={onApplyGeoJSON}
+              onExport={onExport}
+              onFileChange={handleFileChange}
+            />
           )}
 
           {activeSection === 'map' && (
@@ -195,6 +200,103 @@ export default function Menu({
       )}
     </aside>
   );
+}
+
+function DataSection({
+  disabled,
+  features,
+  fileInputRef,
+  onApplyGeoJSON,
+  onExport,
+  onFileChange,
+}) {
+  const initialText = formatCollection(features);
+  const [geoJSONText, setGeoJSONText] = useState(initialText);
+  const [message, setMessage] = useState('GeoJSON is valid.');
+  const editorRef = useRef(null);
+  const suppressMapSyncUntilRef = useRef(0);
+
+  useEffect(() => {
+    if (Date.now() < suppressMapSyncUntilRef.current) return;
+    const formatted = formatCollection(features);
+    setGeoJSONText(formatted);
+    setMessage('Map changes synced to GeoJSON.');
+  }, [features]);
+
+  function formatEditor() {
+    try {
+      setGeoJSONText(JSON.stringify(JSON.parse(geoJSONText), null, 2));
+      setMessage('GeoJSON formatted.');
+    } catch (error) {
+      setMessage(`Cannot format: ${error.message}`);
+    }
+  }
+
+  function updateEditor(value) {
+    setGeoJSONText(value);
+    try {
+      const collection = JSON.parse(value);
+      const result = onApplyGeoJSON(collection);
+      if (!result.ok) {
+        setMessage(result.error);
+        return;
+      }
+      suppressMapSyncUntilRef.current = Date.now() + 250;
+      setMessage('GeoJSON is valid. Map updated.');
+    } catch (error) {
+      setMessage(`Invalid JSON: ${error.message}`);
+    }
+  }
+
+  function resetEditor() {
+    const formatted = formatCollection(features);
+    setGeoJSONText(formatted);
+    setMessage('Restored the last valid map data.');
+  }
+
+  async function copyEditor() {
+    await navigator.clipboard.writeText(geoJSONText);
+    setMessage('GeoJSON copied.');
+  }
+
+  return (
+    <div className="menu-section data-section">
+      <p className="section-label">Import / export</p>
+      <input
+        ref={fileInputRef}
+        className="visually-hidden"
+        type="file"
+        accept=".geojson,.json,application/geo+json,application/json"
+        onChange={onFileChange}
+      />
+      <div className="button-row">
+        <button className="secondary-button" disabled={disabled} type="button" onClick={() => fileInputRef.current?.click()}>Import layer</button>
+        <button className="secondary-button" disabled={disabled || features.length === 0} type="button" onClick={onExport}>Export</button>
+      </div>
+      <p className="data-drop-help">You can also drop a GeoJSON file directly onto the map.</p>
+
+      <div className="map-settings-divider" />
+      <p className="section-label">GeoJSON editor</p>
+      <textarea
+        ref={editorRef}
+        className="geojson-editor"
+        aria-label="GeoJSON editor"
+        spellCheck="false"
+        value={geoJSONText}
+        onChange={(event) => updateEditor(event.target.value)}
+      />
+      <div className="geojson-editor-actions">
+        <button type="button" onClick={formatEditor}>Format</button>
+        <button type="button" onClick={copyEditor}>Copy</button>
+        <button type="button" onClick={resetEditor}>Reset</button>
+      </div>
+      {message && <p className={`geojson-message ${message.startsWith('Invalid') || message.startsWith('Cannot') || message.startsWith('Feature') ? 'is-error' : ''}`} role="status">{message}</p>}
+    </div>
+  );
+}
+
+function formatCollection(features) {
+  return JSON.stringify({ type: 'FeatureCollection', features }, null, 2);
 }
 
 function MapSection({

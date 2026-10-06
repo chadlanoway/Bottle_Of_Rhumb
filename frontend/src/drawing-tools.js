@@ -20,7 +20,7 @@ const previewPopups = new WeakMap();
 
 export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionChange) {
   const draw = new MaplibreTerradrawControl({
-    modes: ['point', 'linestring', 'polygon', 'text', 'select'],
+    modes: ['point', 'linestring', 'polygon', 'circle', 'text', 'select'],
     open: true,
   });
 
@@ -99,6 +99,7 @@ export function startDrawing(draw, geometryType) {
     point: 'point',
     line: 'linestring',
     polygon: 'polygon',
+    circle: 'circle',
     text: 'text',
     select: 'select',
   };
@@ -213,39 +214,73 @@ export function exportGeoJSON(draw, filename = 'bottle-of-rhumb-map.geojson') {
   URL.revokeObjectURL(url);
 }
 
-export async function importGeoJSON(draw, map, file, activeLayerId) {
-  const collection = JSON.parse(await file.text());
-
-  if (collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
-    throw new Error('The selected file is not a GeoJSON FeatureCollection.');
-  }
-
+export function addGeoJSON(draw, map, collection, layerId) {
+  validateGeoJSON(collection);
   const engine = draw.getTerraDrawInstance();
+  const supportedFeatures = prepareFeatures(engine, collection, layerId, true);
+  engine.addFeatures(supportedFeatures);
+  fitMapToCollection(map, collection);
+  return getFeatureCollection(draw);
+}
+
+export function replaceGeoJSON(draw, map, collection, fallbackLayerId) {
+  validateGeoJSON(collection);
+  const engine = draw.getTerraDrawInstance();
+  const supportedFeatures = prepareFeatures(engine, collection, fallbackLayerId, false);
   engine.clear();
+  engine.addFeatures(supportedFeatures);
+  fitMapToCollection(map, collection);
+  return getFeatureCollection(draw);
+}
 
-  const supportedFeatures = collection.features.map((feature) => {
-    const mode = geometryMode(feature.geometry?.type);
-
-    if (!mode) {
-      throw new Error(
-        `Geometry type ${feature.geometry?.type ?? 'unknown'} is not supported yet.`,
-      );
-    }
+function prepareFeatures(engine, collection, layerId, forceLayerId) {
+  return collection.features.map((feature) => {
+    const mode = feature.properties?.featureType === 'text'
+      ? 'text'
+      : geometryMode(feature.geometry.type);
 
     return {
       ...feature,
-      id: feature.id ?? engine.getFeatureId(),
+      id: forceLayerId ? engine.getFeatureId() : feature.id ?? engine.getFeatureId(),
       properties: {
         ...feature.properties,
-        layerId: feature.properties?.layerId ?? activeLayerId,
+        layerId: forceLayerId ? layerId : feature.properties?.layerId ?? layerId,
         mode,
       },
     };
   });
+}
 
-  engine.addFeatures(supportedFeatures);
-  fitMapToCollection(map, collection);
-  return getFeatureCollection(draw);
+export function validateGeoJSON(collection) {
+  if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) {
+    throw new Error('GeoJSON must be a FeatureCollection with a features array.');
+  }
+
+  collection.features.forEach((feature, index) => {
+    if (!feature || feature.type !== 'Feature') {
+      throw new Error(`Feature ${index + 1} is not a valid GeoJSON Feature.`);
+    }
+    const geometryType = feature.geometry?.type;
+    if (!geometryMode(geometryType)) {
+      throw new Error(`Feature ${index + 1} uses unsupported geometry type ${geometryType ?? 'unknown'}.`);
+    }
+    validateCoordinates(feature.geometry.coordinates, index + 1);
+  });
+
+  return collection;
+}
+
+function validateCoordinates(value, featureNumber) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`Feature ${featureNumber} has missing or invalid coordinates.`);
+  }
+  if (Number.isFinite(value[0]) && Number.isFinite(value[1])) {
+    if (value[0] < -180 || value[0] > 180 || value[1] < -90 || value[1] > 90) {
+      throw new Error(`Feature ${featureNumber} contains coordinates outside valid longitude/latitude ranges.`);
+    }
+    return;
+  }
+  for (const child of value) validateCoordinates(child, featureNumber);
 }
 
 function getFeatureCollection(draw) {
