@@ -1,8 +1,10 @@
 import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { RhumbMapControl } from './weather-controls.js';
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
+globalThis.mapboxgl ??= maplibregl;
 
 export function createMap(container) {
   const map = new maplibregl.Map({
@@ -13,10 +15,9 @@ export function createMap(container) {
     attributionControl: true,
   });
 
-  map.addControl(
-    new maplibregl.NavigationControl({ visualizePitch: true }),
-    'bottom-right',
-  );
+  const weatherControl = new RhumbMapControl();
+  map.addControl(weatherControl, 'top-right');
+  map.rhumbWeatherControl = weatherControl;
 
   map.addControl(
     new maplibregl.ScaleControl({ maxWidth: 120, unit: 'imperial' }),

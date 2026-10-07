@@ -27,6 +27,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .app-shell, .map-canvas { width: 100%; height: 100%; }
 .app-shell { position: relative; overflow: hidden; }
 .map-canvas { position: absolute; inset: 0; }
+.weather-feature-overlay {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
 .maplibregl-canvas.placing-map-text { cursor: crosshair; }
 
 .app-header {
@@ -537,11 +544,48 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 .maplibregl-ctrl-top-right { top: calc(var(--header-height) + var(--toolbar-height)); }
-.maplibregl-ctrl-group { overflow: hidden; border-radius: 7px !important; background: rgba(30,144,255,.86) !important; }
-.maplibregl-ctrl-group button:hover { background-color: var(--blue) !important; }
+.maplibregl-ctrl-group { overflow: hidden; border-radius: 999px !important; background: rgba(16, 25, 30, .94) !important; }
+.maplibregl-ctrl-group button:hover { background-color: rgba(30, 144, 255, .28) !important; }
+.rhumb-map-controls {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 7px 22px rgba(0, 0, 0, .36) !important;
+  backdrop-filter: blur(7px);
+}
+.rhumb-map-controls .rhumb-control-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 50%;
+  background: transparent;
+  color: #eef5f8;
+  font: 700 20px/1 system-ui, sans-serif;
+}
+.rhumb-map-controls .rhumb-control-compass { color: var(--green); font-size: 24px; }
+.rhumb-map-controls .rhumb-control-wind,
+.rhumb-map-controls .rhumb-control-waves { font-size: 18px; }
+.rhumb-map-controls .rhumb-control-wind { border-top: 1px solid var(--panel-border) !important; }
+.rhumb-map-controls .rhumb-control-button.is-active {
+  background: var(--blue) !important;
+  color: #06121a;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+}
+.rhumb-map-controls .rhumb-control-button.is-loading { animation: weather-pulse .8s ease-in-out infinite alternate; }
+.rhumb-map-controls .rhumb-control-button.is-unavailable { opacity: .34; }
+.legend-stack { display: grid; gap: 7px; }
+.overlay-loading { position: absolute; z-index: 35; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.overlay-loading-card { min-width: 180px; padding: 13px 16px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--panel); box-shadow: 0 12px 32px rgba(0,0,0,.4); }
+.overlay-loading-title { margin-bottom: 8px; font-weight: 700; }
+.overlay-loading-shimmer { height: 4px; border-radius: 999px; background: linear-gradient(90deg, transparent, var(--blue), transparent); background-size: 200% 100%; animation: weather-shimmer 1s linear infinite; }
 .drawing-engine-control { display: none !important; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes weather-pulse { to { opacity: .45; } }
+@keyframes weather-shimmer { to { background-position: -200% 0; } }
 
 @media (max-width: 720px) {
   .tool-button span:last-child, .toolbar-feature-count { display: none; }

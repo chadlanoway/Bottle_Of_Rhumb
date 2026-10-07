@@ -38,7 +38,7 @@ export function AppHeader() {
           disabled
           title="Coming later"
         >
-          Donate
+          Reserved
         </button>
       </nav>
     </header>

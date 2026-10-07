@@ -38,6 +38,17 @@ export default function App() {
   activeLayerIdRef.current = activeLayerId;
 
   useEffect(() => {
+    const hiddenLayerIds = layers
+      .filter((layer) => !layer.visible)
+      .map((layer) => layer.id);
+    mapRef.current?.rhumbWeatherControl?.setFeatures(
+      features,
+      hiddenLayerIds,
+      selectedFeatureId,
+    );
+  }, [features, layers, selectedFeatureId]);
+
+  useEffect(() => {
     let map;
 
     try {
@@ -65,6 +76,7 @@ export default function App() {
   function handleDraw(type) {
     setError('');
     setSelectedFeatureId(null);
+    mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, type);
   }
 
@@ -167,6 +179,7 @@ export default function App() {
   }
 
   function handleSelectFeature(id) {
+    mapRef.current?.rhumbWeatherControl?.disableWeather();
     setSelectedFeatureId(id);
     selectFeature(drawRef.current, id);
   }
