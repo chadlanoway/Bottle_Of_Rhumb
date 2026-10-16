@@ -91,20 +91,26 @@ export function EditorToolbar({
 
 export default function Menu({
   activeLayerId,
+  basemapId,
+  basemaps,
   disabled,
   features,
   layers,
+  legend,
   savedView,
   selectedFeatureId,
   viewMessage,
   onAddLayer,
   onApplyGeoJSON,
+  onBasemapChange,
   onClearView,
   onDeleteLayer,
   onExport,
   onImport,
   onFitToFeatures,
   onLayerChange,
+  onLegendChange,
+  onLegendLayerChange,
   onRenameLayer,
   onPreviewView,
   onSaveView,
@@ -179,11 +185,18 @@ export default function Menu({
 
           {activeSection === 'map' && (
             <MapSection
+              basemapId={basemapId}
+              basemaps={basemaps}
               disabled={disabled}
+              layers={layers}
+              legend={legend}
               savedView={savedView}
               viewMessage={viewMessage}
+              onBasemapChange={onBasemapChange}
               onClearView={onClearView}
               onFitToFeatures={onFitToFeatures}
+              onLegendChange={onLegendChange}
+              onLegendLayerChange={onLegendLayerChange}
               onPreviewView={onPreviewView}
               onSaveView={onSaveView}
             />
@@ -300,11 +313,18 @@ function formatCollection(features) {
 }
 
 function MapSection({
+  basemapId,
+  basemaps,
   disabled,
+  layers,
+  legend,
   savedView,
   viewMessage,
+  onBasemapChange,
   onClearView,
   onFitToFeatures,
+  onLegendChange,
+  onLegendLayerChange,
   onPreviewView,
   onSaveView,
 }) {
@@ -345,9 +365,105 @@ function MapSection({
       {viewMessage && <p className="view-message" role="status">{viewMessage}</p>}
 
       <div className="map-settings-divider" />
-      <span className="coming-soon">Coming next</span>
-      <h2>Legend and basemap</h2>
-      <p className="section-help">Legend position, layer labels, and basemap selection will be added here.</p>
+      <p className="section-label">Basemap</p>
+      <label className="field-label" htmlFor="basemap-select">Map style</label>
+      <select
+        id="basemap-select"
+        className="basemap-select"
+        disabled={disabled}
+        value={basemapId}
+        onChange={(event) => onBasemapChange(event.target.value)}
+      >
+        {basemaps.map((basemap) => (
+          <option key={basemap.id} value={basemap.id}>{basemap.name}</option>
+        ))}
+      </select>
+      <p className="basemap-description">
+        {basemaps.find((basemap) => basemap.id === basemapId)?.description}
+      </p>
+
+      <div className="basemap-preview-grid">
+        {basemaps.map((basemap) => (
+          <button
+            className={`basemap-preview is-${basemap.id} ${basemap.id === basemapId ? 'is-selected' : ''}`}
+            disabled={disabled}
+            key={basemap.id}
+            type="button"
+            aria-label={`Use ${basemap.name} basemap`}
+            onClick={() => onBasemapChange(basemap.id)}
+          >
+            <span />
+            <strong>{basemap.name}</strong>
+          </button>
+        ))}
+      </div>
+
+      <div className="map-settings-divider" />
+      <div className="section-heading-row">
+        <p className="section-label">Legend</p>
+        <label className="legend-master-toggle">
+          <input
+            type="checkbox"
+            checked={legend.visible}
+            onChange={(event) => onLegendChange({ visible: event.target.checked })}
+          />
+          <span>Show</span>
+        </label>
+      </div>
+
+      <label className="field-label" htmlFor="legend-title">Title</label>
+      <input
+        id="legend-title"
+        disabled={!legend.visible}
+        value={legend.title}
+        placeholder="Legend"
+        onChange={(event) => onLegendChange({ title: event.target.value })}
+      />
+
+      <label className="field-label" htmlFor="legend-position">Position</label>
+      <select
+        id="legend-position"
+        disabled={!legend.visible}
+        value={legend.position}
+        onChange={(event) => onLegendChange({ position: event.target.value })}
+      >
+        <option value="top-left">Top left</option>
+        <option value="top-right">Top right</option>
+        <option value="bottom-left">Bottom left</option>
+        <option value="bottom-right">Bottom right</option>
+      </select>
+
+      <p className="field-label legend-items-heading">Layer entries</p>
+      <div className="legend-editor-list">
+        {layers.map((layer) => (
+          <div className="legend-editor-row" key={layer.id}>
+            <input
+              type="checkbox"
+              checked={layer.showInLegend !== false}
+              disabled={!legend.visible}
+              title={`Include ${layer.name} in legend`}
+              aria-label={`Include ${layer.name} in legend`}
+              onChange={(event) => onLegendLayerChange(layer.id, { showInLegend: event.target.checked })}
+            />
+            <input
+              className="legend-color-input"
+              type="color"
+              value={layer.legendColor ?? '#1e90ff'}
+              disabled={!legend.visible || layer.showInLegend === false}
+              title={`Legend color for ${layer.name}`}
+              aria-label={`Legend color for ${layer.name}`}
+              onChange={(event) => onLegendLayerChange(layer.id, { legendColor: event.target.value })}
+            />
+            <input
+              value={layer.legendLabel ?? layer.name}
+              disabled={!legend.visible || layer.showInLegend === false}
+              aria-label={`Legend label for ${layer.name}`}
+              onChange={(event) => onLegendLayerChange(layer.id, { legendLabel: event.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+      <p className="legend-help">The symbol shape follows the geometry in each layer. Color and label can be adjusted for the published legend.</p>
     </div>
   );
 }

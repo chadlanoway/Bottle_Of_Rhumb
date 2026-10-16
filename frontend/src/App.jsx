@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Menu, { AppHeader, EditorToolbar } from './Menu.jsx';
 import FeatureEditor from './FeatureEditor.jsx';
-import { createMap, fitMapToFeatures, getMapView, previewMapView } from './map.js';
+import {
+  BASEMAPS,
+  createMap,
+  fitMapToFeatures,
+  getMapView,
+  previewMapView,
+  setBasemap,
+} from './map.js';
 import {
   addGeoJSON,
   deleteSelected,
@@ -17,7 +24,20 @@ import {
   updateFeature,
 } from './drawing-tools.js';
 
-const DEFAULT_LAYER = { id: 'default-layer', name: 'Untitled layer', visible: true };
+const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
+
+function makeLayer(id, name, index = 0) {
+  return {
+    id,
+    name,
+    visible: true,
+    showInLegend: true,
+    legendLabel: name,
+    legendColor: LEGEND_COLORS[index % LEGEND_COLORS.length],
+  };
+}
+
+const DEFAULT_LAYER = makeLayer('default-layer', 'Untitled layer');
 
 export default function App() {
   const mapContainerRef = useRef(null);
@@ -34,6 +54,12 @@ export default function App() {
   const [viewMessage, setViewMessage] = useState('');
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [basemapId, setBasemapId] = useState('positron');
+  const [legend, setLegend] = useState({
+    visible: true,
+    title: 'Legend',
+    position: 'top-right',
+  });
 
   activeLayerIdRef.current = activeLayerId;
 
@@ -52,7 +78,7 @@ export default function App() {
     let map;
 
     try {
-      map = createMap(mapContainerRef.current);
+      map = createMap(mapContainerRef.current, basemapId);
       mapRef.current = map;
       map.on('load', () => {
         drawRef.current = setupDrawingTools(
@@ -92,7 +118,7 @@ export default function App() {
         layerId,
       );
       const name = file.name.replace(/\.(geojson|json)$/i, '') || 'Imported layer';
-      setLayers((current) => [...current, { id: layerId, name, visible: true }]);
+      setLayers((current) => [...current, makeLayer(layerId, name, current.length)]);
       setActiveLayerId(layerId);
       setSelectedFeatureId(null);
       setFeatures(loaded.features);
@@ -130,7 +156,8 @@ export default function App() {
         const id = feature.properties?.layerId ?? activeLayerId;
         if (!known.has(id)) {
           known.add(id);
-          missing.push({ id, name: `Imported layer ${missing.length + 1}`, visible: true });
+          const name = `Imported layer ${missing.length + 1}`;
+          missing.push(makeLayer(id, name, current.length + missing.length));
         }
       }
       return [...current, ...missing];
@@ -173,7 +200,7 @@ export default function App() {
     const id = `layer-${crypto.randomUUID()}`;
     setLayers((current) => [
       ...current,
-      { id, name: `Layer ${current.length + 1}`, visible: true },
+      makeLayer(id, `Layer ${current.length + 1}`, current.length),
     ]);
     setActiveLayerId(id);
   }
@@ -263,6 +290,36 @@ export default function App() {
     setViewMessage('Saved opening view cleared.');
   }
 
+  function handleBasemapChange(nextId) {
+    if (!mapRef.current || nextId === basemapId) return;
+    setError('');
+    mapRef.current.rhumbWeatherControl?.disableWeather();
+    setBasemap(mapRef.current, nextId);
+    setBasemapId(nextId);
+  }
+
+  function handleLegendChange(changes) {
+    setLegend((current) => ({ ...current, ...changes }));
+  }
+
+  function handleLegendLayerChange(id, changes) {
+    setLayers((current) => current.map((layer) => (
+      layer.id === id ? { ...layer, ...changes } : layer
+    )));
+  }
+
+  function handleRenameLayer(id, name) {
+    setLayers((current) => current.map((layer) => {
+      if (layer.id !== id) return layer;
+      const previousDefault = !layer.legendLabel || layer.legendLabel === layer.name;
+      return {
+        ...layer,
+        name,
+        legendLabel: previousDefault ? name : layer.legendLabel,
+      };
+    }));
+  }
+
   const activeLayer = layers.find((layer) => layer.id === activeLayerId);
   const selectedFeature = features.find(
     (feature) => String(feature.id) === String(selectedFeatureId),
@@ -277,6 +334,7 @@ export default function App() {
       onDrop={handleDrop}
     >
       <div ref={mapContainerRef} className="map-canvas" />
+      <MapLegend legend={legend} layers={layers} features={features} />
       <AppHeader />
       <EditorToolbar
         activeLayer={activeLayer}
@@ -289,22 +347,26 @@ export default function App() {
       />
       <Menu
         activeLayerId={activeLayerId}
+        basemapId={basemapId}
+        basemaps={BASEMAPS}
         disabled={!mapReady}
         features={features}
         layers={layers}
+        legend={legend}
         selectedFeatureId={selectedFeatureId}
         savedView={savedView}
         viewMessage={viewMessage}
         onAddLayer={handleAddLayer}
+        onBasemapChange={handleBasemapChange}
         onExport={() => exportGeoJSON(drawRef.current)}
         onImport={handleImport}
         onApplyGeoJSON={handleApplyGeoJSON}
         onClearView={handleClearView}
         onDeleteLayer={handleDeleteLayer}
         onLayerChange={setActiveLayerId}
-        onRenameLayer={(id, name) => setLayers((current) => current.map(
-          (layer) => (layer.id === id ? { ...layer, name } : layer),
-        ))}
+        onLegendChange={handleLegendChange}
+        onLegendLayerChange={handleLegendLayerChange}
+        onRenameLayer={handleRenameLayer}
         onSelectFeature={handleSelectFeature}
         onFitToFeatures={handleFitToFeatures}
         onPreviewView={handlePreviewView}
@@ -342,6 +404,51 @@ export default function App() {
       )}
     </main>
   );
+}
+
+function MapLegend({ legend, layers, features }) {
+  if (!legend.visible) return null;
+
+  const entries = layers.filter((layer) => layer.visible && layer.showInLegend !== false);
+  if (entries.length === 0) return null;
+
+  return (
+    <section className={`map-legend map-legend--${legend.position}`} aria-label={legend.title || 'Map legend'}>
+      {legend.title && <h2>{legend.title}</h2>}
+      <div className="map-legend__items">
+        {entries.map((layer) => {
+          const layerFeatures = features.filter(
+            (feature) => (feature.properties?.layerId ?? layers[0]?.id) === layer.id,
+          );
+          const symbol = getLegendSymbol(layerFeatures);
+          return (
+            <div className="map-legend__item" key={layer.id}>
+              <LegendSymbol color={layer.legendColor} symbol={symbol} />
+              <span>{layer.legendLabel || layer.name}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function LegendSymbol({ color, symbol }) {
+  if (symbol === 'text') {
+    return <span className="map-legend__text-symbol" style={{ color }} aria-hidden="true">T</span>;
+  }
+  return <span className={`map-legend__symbol is-${symbol}`} style={{ '--legend-color': color }} aria-hidden="true" />;
+}
+
+function getLegendSymbol(features) {
+  if (features.some((feature) => feature.properties?.featureType === 'text')) return 'text';
+  const geometryTypes = new Set(features.map((feature) => feature.geometry?.type));
+  if (geometryTypes.size !== 1) return 'mixed';
+  const [type] = geometryTypes;
+  if (type === 'Point' || type === 'MultiPoint') return 'point';
+  if (type === 'LineString' || type === 'MultiLineString') return 'line';
+  if (type === 'Polygon' || type === 'MultiPolygon') return 'polygon';
+  return 'mixed';
 }
 
 function hasFileTransfer(event) {
