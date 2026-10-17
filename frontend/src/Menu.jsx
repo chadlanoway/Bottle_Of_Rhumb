@@ -433,6 +433,89 @@ function MapSection({
         <option value="bottom-right">Bottom right</option>
       </select>
 
+      <fieldset className="legend-appearance-fieldset" disabled={!legend.visible}>
+        <legend>Appearance</legend>
+        <div className="legend-appearance-grid">
+          <label>
+            <span className="field-label">Background</span>
+            <input
+              className="legend-color-input"
+              type="color"
+              value={legend.backgroundColor}
+              onChange={(event) => onLegendChange({ backgroundColor: event.target.value })}
+            />
+          </label>
+          <label>
+            <span className="field-label">Text color</span>
+            <input
+              className="legend-color-input"
+              type="color"
+              value={legend.textColor}
+              onChange={(event) => onLegendChange({ textColor: event.target.value })}
+            />
+          </label>
+          <label className="legend-font-field">
+            <span className="field-label">Font</span>
+            <select
+              value={legend.fontFamily}
+              onChange={(event) => onLegendChange({ fontFamily: event.target.value })}
+            >
+              <option value="sans">Sans serif</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Monospace</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="legend-range-field">
+          <span>Background opacity</span>
+          <input
+            type="range"
+            min="20"
+            max="100"
+            step="1"
+            value={legend.backgroundOpacity}
+            onChange={(event) => onLegendChange({ backgroundOpacity: Number(event.target.value) })}
+          />
+          <output>{legend.backgroundOpacity}%</output>
+        </label>
+
+        <label className="legend-glow-toggle">
+          <input
+            type="checkbox"
+            checked={legend.glowEnabled}
+            onChange={(event) => onLegendChange({ glowEnabled: event.target.checked })}
+          />
+          <span>Box glow</span>
+        </label>
+
+        {legend.glowEnabled && (
+          <div className="legend-glow-options">
+            <label>
+              <span className="field-label">Glow color</span>
+              <input
+                className="legend-color-input"
+                type="color"
+                value={legend.glowColor}
+                onChange={(event) => onLegendChange({ glowColor: event.target.value })}
+              />
+            </label>
+            <label className="legend-range-field">
+              <span>Glow size</span>
+              <input
+                type="range"
+                min="4"
+                max="40"
+                step="1"
+                value={legend.glowSize}
+                onChange={(event) => onLegendChange({ glowSize: Number(event.target.value) })}
+              />
+              <output>{legend.glowSize}px</output>
+            </label>
+          </div>
+        )}
+      </fieldset>
+
       <p className="field-label legend-items-heading">Layer entries</p>
       <div className="legend-editor-list">
         {layers.map((layer) => (

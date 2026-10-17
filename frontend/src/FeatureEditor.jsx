@@ -32,10 +32,12 @@ const FONT_OPTIONS = [
   { value: 'mono', label: 'Monospace' },
 ];
 
-export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }) {
+export default function FeatureEditor({ feature, features = [], onDelete, onGeometryOperation, onPreview, onUpdate }) {
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [rows, setRows] = useState([]);
+  const selectionCount = features.length || (feature ? 1 : 0);
+  const multiple = selectionCount > 1;
 
   const customProperties = useMemo(
     () => Object.entries(feature?.properties ?? {}).filter(
@@ -46,15 +48,15 @@ export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }
 
   useEffect(() => {
     const textFeature = feature?.properties?.featureType === 'text';
-    setCollapsed(!textFeature);
-    setActiveTab(textFeature ? 'text' : 'details');
+    setCollapsed(multiple ? false : !textFeature);
+    setActiveTab(multiple ? 'geometry' : textFeature ? 'text' : 'details');
     setRows(customProperties.map(([key, value]) => ({
       id: crypto.randomUUID(),
       key,
       value: formatValue(value),
       savedKey: key,
     })));
-  }, [feature?.id, feature?.properties?.featureType]);
+  }, [feature?.id, feature?.properties?.featureType, multiple, selectionCount]);
 
   if (!feature) return null;
 
@@ -89,12 +91,12 @@ export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }
       <button
         className="feature-editor-toggle"
         type="button"
-        title="Open feature editor"
+        title="Open feature editor. Hold Shift while clicking map features to select several."
         aria-label="Open feature editor"
         onClick={() => setCollapsed(false)}
       >
         <span aria-hidden="true">☷</span>
-        <span className="feature-editor-toggle-label">Feature</span>
+        <span className="feature-editor-toggle-label">{multiple ? `${selectionCount} features` : 'Feature'}</span>
       </button>
     );
   }
@@ -103,14 +105,19 @@ export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }
     <section className="feature-editor" aria-label="Feature editor">
       <header className="feature-editor-heading">
         <div>
-          <span className="feature-editor-eyebrow">Selected feature</span>
-          <strong>{feature.properties?.name || feature.geometry?.type}</strong>
+          <span className="feature-editor-eyebrow">{multiple ? 'Multiple selection' : 'Selected feature'}</span>
+          <strong>{multiple ? `${selectionCount} selected features` : feature.properties?.name || feature.geometry?.type}</strong>
         </div>
         <button className="editor-collapse-button" type="button" aria-label="Collapse feature editor" onClick={() => setCollapsed(true)}>⌄</button>
       </header>
 
-      <nav className="feature-editor-tabs" aria-label="Feature editor sections">
-        {['details', 'text', 'popup', 'properties'].map((tab) => (
+      <div className="multi-select-help" title="Hold Shift and click map features to add them to the selection. Click normally to begin a new selection.">
+        <span aria-hidden="true">ⓘ</span>
+        <span>Hold <kbd>Shift</kbd> and click map features to select several.</span>
+      </div>
+
+      <nav className={`feature-editor-tabs ${multiple ? 'is-multi' : ''}`} aria-label="Feature editor sections">
+        {(multiple ? ['geometry'] : ['details', 'text', 'popup', 'properties', 'geometry']).map((tab) => (
           <button className={activeTab === tab ? 'is-active' : ''} key={tab} type="button" onClick={() => setActiveTab(tab)}>
             {tab}
           </button>
@@ -118,7 +125,7 @@ export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }
       </nav>
 
       <div className="feature-editor-body">
-        {activeTab === 'details' && (
+        {!multiple && activeTab === 'details' && (
           <>
             <label className="field-label" htmlFor="feature-editor-name">Name</label>
             <input
@@ -138,7 +145,7 @@ export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }
           </>
         )}
 
-        {activeTab === 'properties' && (
+        {!multiple && activeTab === 'properties' && (
           <>
             <div className="property-column-labels"><span>Key</span><span>Value</span><span /></div>
             <div className="property-list">
@@ -175,20 +182,78 @@ export default function FeatureEditor({ feature, onDelete, onPreview, onUpdate }
           </>
         )}
 
-        {activeTab === 'text' && (
+        {!multiple && activeTab === 'text' && (
           <TextControls feature={feature} isTextFeature={isTextFeature} onUpdate={onUpdate} />
         )}
 
-        {activeTab === 'popup' && (
+        {!multiple && activeTab === 'popup' && (
           <PopupControls feature={feature} onPreview={onPreview} onUpdate={onUpdate} />
+        )}
+
+        {activeTab === 'geometry' && (
+          <GeometryControls feature={feature} selectionCount={selectionCount} onRun={onGeometryOperation} />
         )}
       </div>
 
       <footer className="feature-editor-footer">
-        <span>{isTextFeature ? 'Text' : feature.geometry?.type}</span>
-        <button className="delete-feature-button" type="button" onClick={onDelete}>Delete feature</button>
+        <span>{multiple ? `${selectionCount} selected` : isTextFeature ? 'Text' : feature.geometry?.type}</span>
+        <button className="delete-feature-button" type="button" onClick={onDelete}>
+          {multiple ? `Delete ${selectionCount} features` : 'Delete feature'}
+        </button>
       </footer>
     </section>
+  );
+}
+
+function GeometryControls({ feature, selectionCount, onRun }) {
+  const [tolerance, setTolerance] = useState(0.001);
+  const [status, setStatus] = useState('');
+  const type = feature.geometry?.type;
+  const canSimplify = type === 'LineString' || type === 'Polygon';
+  const hasSeveralCoordinates = type !== 'Point';
+  const multiple = selectionCount > 1;
+
+  async function run(operation, options) {
+    const response = await onRun(operation, options);
+    setStatus(response?.message ?? '');
+  }
+
+  return (
+    <div className="geometry-controls">
+      <p className="geometry-help">
+        Results are added as new features in the most recently selected feature’s layer. Originals stay unchanged.
+      </p>
+      <div className="geometry-operation-grid">
+        <button type="button" disabled={multiple} onClick={() => run('centroid')}>Create centroid<span>One selected feature</span></button>
+        <button type="button" disabled={!multiple && !hasSeveralCoordinates} onClick={() => run('extent')}>Add extent box<span>Around all selected features</span></button>
+        <button type="button" onClick={() => run('hull')}>Add convex hull<span>Around the outermost coordinates</span></button>
+        <button type="button" disabled={!multiple && type === 'Point'} onClick={() => run('points')}>Convert to points<span>Vertices from all selections</span></button>
+      </div>
+
+      <div className="simplify-controls">
+        <div>
+          <strong>Simplify geometry</strong>
+          <span>Reduce vertices while keeping the overall shape.</span>
+        </div>
+        <label htmlFor="simplify-tolerance">
+          Tolerance (degrees)
+          <input
+            id="simplify-tolerance"
+            type="number"
+            min="0.000001"
+            max="1"
+            step="0.0001"
+            value={tolerance}
+            disabled={multiple || !canSimplify}
+            onChange={(event) => setTolerance(event.target.value)}
+          />
+        </label>
+        <button type="button" disabled={multiple || !canSimplify} onClick={() => run('simplify', { tolerance })}>
+          Add simplified copy
+        </button>
+      </div>
+      {status && <p className="geometry-status" role="status">{status}</p>}
+    </div>
   );
 }
 

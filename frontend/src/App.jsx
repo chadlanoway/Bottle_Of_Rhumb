@@ -7,22 +7,24 @@ import {
   fitMapToFeatures,
   getMapView,
   previewMapView,
-  setBasemap,
 } from './map.js';
 import {
+  addDerivedGeoJSON,
   addGeoJSON,
-  deleteSelected,
-  deleteFeature,
+  deleteFeatures,
   deleteLayerFeatures,
   exportGeoJSON,
   previewFeaturePopup,
   replaceGeoJSON,
+  restoreGeoJSON,
   selectFeature,
   setHiddenLayers,
+  setMultiSelectedFeatures,
   setupDrawingTools,
   startDrawing,
   updateFeature,
 } from './drawing-tools.js';
+import { runGeometryOperation } from './geometry-operations.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -49,7 +51,7 @@ export default function App() {
   const [features, setFeatures] = useState([]);
   const [layers, setLayers] = useState([DEFAULT_LAYER]);
   const [activeLayerId, setActiveLayerId] = useState(DEFAULT_LAYER.id);
-  const [selectedFeatureId, setSelectedFeatureId] = useState(null);
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState([]);
   const [savedView, setSavedView] = useState(null);
   const [viewMessage, setViewMessage] = useState('');
   const [error, setError] = useState('');
@@ -59,9 +61,17 @@ export default function App() {
     visible: true,
     title: 'Legend',
     position: 'top-right',
+    backgroundColor: '#ffffff',
+    backgroundOpacity: 94,
+    textColor: '#172229',
+    fontFamily: 'sans',
+    glowEnabled: false,
+    glowColor: '#1e90ff',
+    glowSize: 18,
   });
 
   activeLayerIdRef.current = activeLayerId;
+  const selectedFeatureId = selectedFeatureIds.at(-1) ?? null;
 
   useEffect(() => {
     const hiddenLayerIds = layers
@@ -72,36 +82,72 @@ export default function App() {
       hiddenLayerIds,
       selectedFeatureId,
     );
-  }, [features, layers, selectedFeatureId]);
+    setMultiSelectedFeatures(mapRef.current, features, selectedFeatureIds);
+  }, [features, layers, selectedFeatureId, selectedFeatureIds]);
 
   useEffect(() => {
-    let map;
-
     try {
-      map = createMap(mapContainerRef.current, basemapId);
-      mapRef.current = map;
-      map.on('load', () => {
-        drawRef.current = setupDrawingTools(
-          map,
-          (collection) => setFeatures(collection.features),
-          () => activeLayerIdRef.current,
-          setSelectedFeatureId,
-        );
-        setMapReady(true);
-      });
-      map.on('error', (event) => {
-        if (event.error) setError(event.error.message);
-      });
+      mountMap(basemapId, [], [DEFAULT_LAYER], null);
     } catch (caughtError) {
       setError(caughtError.message);
     }
 
-    return () => map?.remove();
+    return () => mapRef.current?.remove();
   }, []);
+
+  function mountMap(nextBasemapId, restoredFeatures, restoredLayers, restoredSelection) {
+    const map = createMap(mapContainerRef.current, nextBasemapId);
+    mapRef.current = map;
+
+    map.on('load', () => {
+      const draw = setupDrawingTools(
+        map,
+        (collection) => setFeatures(collection.features),
+        () => activeLayerIdRef.current,
+        handleSelectionChange,
+      );
+      drawRef.current = draw;
+
+      if (restoredFeatures.length > 0) {
+        restoreGeoJSON(
+          draw,
+          { type: 'FeatureCollection', features: restoredFeatures },
+          activeLayerIdRef.current,
+        );
+      }
+
+      const hiddenLayerIds = restoredLayers
+        .filter((layer) => !layer.visible)
+        .map((layer) => layer.id);
+      setHiddenLayers(draw, map, hiddenLayerIds);
+
+      const restoredPrimary = restoredSelection?.at?.(-1) ?? restoredSelection ?? null;
+      if (restoredPrimary !== null && restoredPrimary !== undefined) {
+        try {
+          selectFeature(draw, restoredPrimary);
+        } catch {
+          setSelectedFeatureIds([]);
+        }
+      }
+
+      setMultiSelectedFeatures(map, restoredFeatures, restoredSelection ?? []);
+
+      map.rhumbWeatherControl?.setFeatures(
+        restoredFeatures,
+        hiddenLayerIds,
+        restoredPrimary,
+      );
+      setMapReady(true);
+    });
+
+    map.on('error', (event) => {
+      if (event.error) setError(event.error.message);
+    });
+  }
 
   function handleDraw(type) {
     setError('');
-    setSelectedFeatureId(null);
+    setSelectedFeatureIds([]);
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, type);
   }
@@ -120,7 +166,7 @@ export default function App() {
       const name = file.name.replace(/\.(geojson|json)$/i, '') || 'Imported layer';
       setLayers((current) => [...current, makeLayer(layerId, name, current.length)]);
       setActiveLayerId(layerId);
-      setSelectedFeatureId(null);
+      setSelectedFeatureIds([]);
       setFeatures(loaded.features);
       return { ok: true };
     } catch (caughtError) {
@@ -139,7 +185,7 @@ export default function App() {
         activeLayerId,
       );
       setFeatures(loaded.features);
-      setSelectedFeatureId(null);
+      setSelectedFeatureIds([]);
       addMissingLayers(loaded.features);
       return { ok: true };
     } catch (caughtError) {
@@ -207,8 +253,22 @@ export default function App() {
 
   function handleSelectFeature(id) {
     mapRef.current?.rhumbWeatherControl?.disableWeather();
-    setSelectedFeatureId(id);
     selectFeature(drawRef.current, id);
+  }
+
+  function handleSelectionChange(id, { additive = false } = {}) {
+    if (id === null || id === undefined) {
+      if (!additive) setSelectedFeatureIds([]);
+      return;
+    }
+
+    setSelectedFeatureIds((current) => {
+      if (!additive) return [id];
+      const alreadySelected = current.some((candidate) => String(candidate) === String(id));
+      return alreadySelected
+        ? [...current.filter((candidate) => String(candidate) !== String(id)), id]
+        : [...current, id];
+    });
   }
 
   function handleToggleLayer(id) {
@@ -223,13 +283,9 @@ export default function App() {
   }
 
   function handleDeleteFeature() {
-    if (selectedFeatureId === null) {
-      deleteSelected(drawRef.current);
-      return;
-    }
-
-    deleteFeature(drawRef.current, selectedFeatureId);
-    setSelectedFeatureId(null);
+    if (selectedFeatureIds.length === 0) return;
+    deleteFeatures(drawRef.current, selectedFeatureIds);
+    setSelectedFeatureIds([]);
   }
 
   function handleDeleteLayer(id) {
@@ -251,12 +307,27 @@ export default function App() {
 
     setLayers(nextLayers);
     setActiveLayerId(nextActiveId);
-    setSelectedFeatureId(null);
+    setSelectedFeatureIds([]);
     setHiddenLayers(
       drawRef.current,
       mapRef.current,
       nextLayers.filter((candidate) => !candidate.visible).map((candidate) => candidate.id),
     );
+  }
+
+  function handleGeometryOperation(operation, options) {
+    try {
+      setError('');
+      if (selectedFeatures.length === 0) throw new Error('Select at least one feature first.');
+      const derived = runGeometryOperation(selectedFeatures, operation, options);
+      const layerId = selectedFeature.properties?.layerId ?? activeLayerId;
+      const added = addDerivedGeoJSON(drawRef.current, derived, layerId);
+      setFeatures(added.collection.features);
+      return { ok: true, message: derived.message };
+    } catch (caughtError) {
+      setError(caughtError.message);
+      return { ok: false, message: caughtError.message };
+    }
   }
 
   function handleSaveView() {
@@ -293,8 +364,18 @@ export default function App() {
   function handleBasemapChange(nextId) {
     if (!mapRef.current || nextId === basemapId) return;
     setError('');
+    const restoredFeatures = features.map((feature) => structuredClone(feature));
+    const restoredLayers = layers.map((layer) => ({ ...layer }));
+    const restoredSelection = [...selectedFeatureIds];
+
+    setMapReady(false);
     mapRef.current.rhumbWeatherControl?.disableWeather();
-    setBasemap(mapRef.current, nextId);
+    mapRef.current.remove();
+    drawRef.current = null;
+    mapRef.current = null;
+    mapContainerRef.current?.replaceChildren();
+
+    mountMap(nextId, restoredFeatures, restoredLayers, restoredSelection);
     setBasemapId(nextId);
   }
 
@@ -324,6 +405,9 @@ export default function App() {
   const selectedFeature = features.find(
     (feature) => String(feature.id) === String(selectedFeatureId),
   );
+  const selectedFeatures = selectedFeatureIds
+    .map((id) => features.find((feature) => String(feature.id) === String(id)))
+    .filter(Boolean);
 
   return (
     <main
@@ -375,7 +459,9 @@ export default function App() {
       />
       <FeatureEditor
         feature={selectedFeature}
+        features={selectedFeatures}
         onDelete={handleDeleteFeature}
+        onGeometryOperation={handleGeometryOperation}
         onPreview={() => previewFeaturePopup(drawRef.current, mapRef.current, selectedFeatureId)}
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
       />
@@ -398,7 +484,10 @@ export default function App() {
 
       {error && (
         <div className="error-banner" role="alert">
-          <strong>Map error</strong>
+          <div className="error-banner-heading">
+            <strong>Map error</strong>
+            <button type="button" aria-label="Dismiss map error" onClick={() => setError('')}>×</button>
+          </div>
           <span>{error}</span>
         </div>
       )}
@@ -413,7 +502,18 @@ function MapLegend({ legend, layers, features }) {
   if (entries.length === 0) return null;
 
   return (
-    <section className={`map-legend map-legend--${legend.position}`} aria-label={legend.title || 'Map legend'}>
+    <section
+      className={`map-legend map-legend--${legend.position}`}
+      aria-label={legend.title || 'Map legend'}
+      style={{
+        backgroundColor: hexToRgba(legend.backgroundColor, legend.backgroundOpacity / 100),
+        color: legend.textColor,
+        fontFamily: legendFontFamily(legend.fontFamily),
+        boxShadow: legend.glowEnabled
+          ? `0 0 ${legend.glowSize}px ${legend.glowColor}, 0 5px 18px rgba(0,0,0,.2)`
+          : '0 5px 18px rgba(0,0,0,.2)',
+      }}
+    >
       {legend.title && <h2>{legend.title}</h2>}
       <div className="map-legend__items">
         {entries.map((layer) => {
@@ -449,6 +549,20 @@ function getLegendSymbol(features) {
   if (type === 'LineString' || type === 'MultiLineString') return 'line';
   if (type === 'Polygon' || type === 'MultiPolygon') return 'polygon';
   return 'mixed';
+}
+
+function legendFontFamily(font) {
+  if (font === 'serif') return 'Georgia, serif';
+  if (font === 'mono') return 'Consolas, "Courier New", monospace';
+  return 'Arial, Helvetica, sans-serif';
+}
+
+function hexToRgba(hex, opacity) {
+  const normalized = /^#[0-9a-f]{6}$/i.test(hex) ? hex.slice(1) : 'ffffff';
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${Math.min(1, Math.max(0, opacity))})`;
 }
 
 function hasFileTransfer(event) {

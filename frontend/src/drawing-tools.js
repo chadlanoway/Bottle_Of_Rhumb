@@ -15,6 +15,10 @@ const liveDrawingOverlays = new WeakMap();
 const TEXT_SOURCE = 'bottle-of-rhumb-text';
 const FEATURE_LABEL_LAYER = 'bottle-of-rhumb-feature-labels';
 const FREE_TEXT_LAYER = 'bottle-of-rhumb-free-text';
+const MULTI_SELECT_SOURCE = 'bottle-of-rhumb-multi-selection';
+const MULTI_SELECT_FILL = 'bottle-of-rhumb-multi-selection-fill';
+const MULTI_SELECT_LINE = 'bottle-of-rhumb-multi-selection-line';
+const MULTI_SELECT_POINT = 'bottle-of-rhumb-multi-selection-point';
 const backgroundMarkerStates = new WeakMap();
 const previewPopups = new WeakMap();
 
@@ -28,6 +32,20 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
 
   const engine = draw.getTerraDrawInstance();
   ensureTextLayers(map);
+  ensureMultiSelectionLayers(map);
+  keepPointLayersAbovePolygons(map);
+  let shiftPressed = false;
+  const handleKeyDown = (event) => { if (event.key === 'Shift') shiftPressed = true; };
+  const handleKeyUp = (event) => { if (event.key === 'Shift') shiftPressed = false; };
+  const clearShift = () => { shiftPressed = false; };
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  window.addEventListener('blur', clearShift);
+  map.once('remove', () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+    window.removeEventListener('blur', clearShift);
+  });
   backgroundMarkerStates.set(map, {
     engine,
     hiddenLayerIds: new Set(),
@@ -56,16 +74,16 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
         textSize: 16,
       });
     }
-    onSelectionChange?.(id);
+    onSelectionChange?.(id, { additive: false });
     reportChange();
   });
   engine?.on('change', reportChange);
   engine?.on('select', (id) => {
-    onSelectionChange?.(id);
+    onSelectionChange?.(id, { additive: shiftPressed });
     reportChange();
   });
   engine?.on('deselect', () => {
-    onSelectionChange?.(null);
+    if (!shiftPressed) onSelectionChange?.(null, { additive: false });
     reportChange();
   });
 
@@ -79,7 +97,6 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
     const id = event.features?.[0]?.id;
     if (id === undefined) return;
     engine?.selectFeature(id);
-    onSelectionChange?.(id);
   });
   map.on('mouseenter', FREE_TEXT_LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', FREE_TEXT_LAYER, () => { map.getCanvas().style.cursor = ''; });
@@ -124,6 +141,11 @@ export function deleteSelected(draw) {
 export function deleteFeature(draw, id) {
   if (id === null || id === undefined) return;
   draw?.getTerraDrawInstance()?.removeFeatures([id]);
+}
+
+export function deleteFeatures(draw, ids) {
+  const validIds = (ids ?? []).filter((id) => id !== null && id !== undefined);
+  if (validIds.length > 0) draw?.getTerraDrawInstance()?.removeFeatures(validIds);
 }
 
 export function deleteLayerFeatures(draw, layerId) {
@@ -181,8 +203,14 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
     ['!=', ['get', 'featureType'], 'text'],
     ['==', ['get', 'selected'], true],
   ]];
-  for (const layerId of ['td-point', 'td-point-marker']) {
-    if (map.getLayer(layerId)) map.setFilter(layerId, pointFilter);
+  if (map.getLayer('td-point')) map.setFilter('td-point', pointFilter);
+  if (map.getLayer('td-point-marker')) {
+    map.setFilter('td-point-marker', [
+      'all',
+      pointFilter,
+      ['has', 'markerId'],
+      ['!=', ['get', 'markerId'], null],
+    ]);
   }
 
   if (map.getLayer(FEATURE_LABEL_LAYER)) {
@@ -197,6 +225,16 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
     markerState.hiddenLayerIds = new Set(hiddenLayerIds);
     updateBackgroundMarkerVisibility(markerState);
   }
+}
+
+export function setMultiSelectedFeatures(map, features, selectedIds) {
+  const source = map?.getSource(MULTI_SELECT_SOURCE);
+  if (!source) return;
+  const selected = new Set((selectedIds ?? []).map(String));
+  source.setData({
+    type: 'FeatureCollection',
+    features: (features ?? []).filter((feature) => selected.has(String(feature.id))),
+  });
 }
 
 export function exportGeoJSON(draw, filename = 'bottle-of-rhumb-map.geojson') {
@@ -231,6 +269,77 @@ export function replaceGeoJSON(draw, map, collection, fallbackLayerId) {
   engine.addFeatures(supportedFeatures);
   fitMapToCollection(map, collection);
   return getFeatureCollection(draw);
+}
+
+export function restoreGeoJSON(draw, collection, fallbackLayerId = 'default-layer') {
+  validateGeoJSON(collection);
+  const engine = draw.getTerraDrawInstance();
+  const supportedFeatures = prepareFeatures(engine, collection, fallbackLayerId, false);
+  if (supportedFeatures.length > 0) engine.addFeatures(supportedFeatures);
+  return getFeatureCollection(draw);
+}
+
+export function addDerivedGeoJSON(draw, collection, layerId) {
+  validateGeoJSON(collection);
+  const engine = draw?.getTerraDrawInstance();
+  if (!engine) throw new Error('Drawing tools are not ready.');
+  const prepared = prepareFeatures(engine, collection, layerId, true);
+  if (prepared.length === 0) throw new Error('The operation did not create any features.');
+  const validations = engine.addFeatures(prepared);
+  const failures = validations.filter((validation) => !validation.valid);
+  if (failures.length > 0) {
+    throw new Error(failures.map((failure) => failure.reason ?? 'Feature was rejected.').join(' '));
+  }
+  return {
+    collection: getFeatureCollection(draw),
+    addedIds: validations.map((validation) => validation.id).filter((id) => id !== undefined),
+  };
+}
+
+function keepPointLayersAbovePolygons(map) {
+  const labelAnchor = map.getLayer(FEATURE_LABEL_LAYER) ? FEATURE_LABEL_LAYER : undefined;
+  for (const layerId of ['td-point', 'td-point-marker']) {
+    if (map.getLayer(layerId)) map.moveLayer(layerId, labelAnchor);
+  }
+}
+
+function ensureMultiSelectionLayers(map) {
+  if (!map.getSource(MULTI_SELECT_SOURCE)) {
+    map.addSource(MULTI_SELECT_SOURCE, { type: 'geojson', data: EMPTY_COLLECTION });
+  }
+  if (!map.getLayer(MULTI_SELECT_FILL)) {
+    map.addLayer({
+      id: MULTI_SELECT_FILL,
+      type: 'fill',
+      source: MULTI_SELECT_SOURCE,
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: { 'fill-color': '#ffd166', 'fill-opacity': 0.14 },
+    });
+  }
+  if (!map.getLayer(MULTI_SELECT_LINE)) {
+    map.addLayer({
+      id: MULTI_SELECT_LINE,
+      type: 'line',
+      source: MULTI_SELECT_SOURCE,
+      filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]],
+      paint: { 'line-color': '#ffd166', 'line-width': 4, 'line-opacity': 0.95 },
+    });
+  }
+  if (!map.getLayer(MULTI_SELECT_POINT)) {
+    map.addLayer({
+      id: MULTI_SELECT_POINT,
+      type: 'circle',
+      source: MULTI_SELECT_SOURCE,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 9,
+        'circle-color': '#ffd166',
+        'circle-opacity': 0.28,
+        'circle-stroke-color': '#ffd166',
+        'circle-stroke-width': 3,
+      },
+    });
+  }
 }
 
 function prepareFeatures(engine, collection, layerId, forceLayerId) {
@@ -407,7 +516,6 @@ function syncBackgroundMarkers(map, collection) {
     element.addEventListener('click', (event) => {
       event.stopPropagation();
       state.engine.selectFeature(feature.id);
-      state.onSelectionChange?.(feature.id);
     });
 
     const marker = new Marker({ element, anchor: 'center' })
