@@ -48,7 +48,7 @@ export default function FeatureEditor({ feature, features = [], onDelete, onGeom
 
   useEffect(() => {
     const textFeature = feature?.properties?.featureType === 'text';
-    setCollapsed(multiple ? false : !textFeature);
+    setCollapsed(true);
     setActiveTab(multiple ? 'geometry' : textFeature ? 'text' : 'details');
     setRows(customProperties.map(([key, value]) => ({
       id: crypto.randomUUID(),
@@ -91,7 +91,7 @@ export default function FeatureEditor({ feature, features = [], onDelete, onGeom
       <button
         className="feature-editor-toggle"
         type="button"
-        title="Open feature editor. Hold Shift while clicking map features to select several."
+        title="Open feature editor. Hold Shift, Ctrl, or Cmd while clicking features to select several."
         aria-label="Open feature editor"
         onClick={() => setCollapsed(false)}
       >
@@ -111,9 +111,9 @@ export default function FeatureEditor({ feature, features = [], onDelete, onGeom
         <button className="editor-collapse-button" type="button" aria-label="Collapse feature editor" onClick={() => setCollapsed(true)}>⌄</button>
       </header>
 
-      <div className="multi-select-help" title="Hold Shift and click map features to add them to the selection. Click normally to begin a new selection.">
+      <div className="multi-select-help" title="Hold Shift, Ctrl, or Cmd and click map or layer-list features to add them. Click normally to begin a new selection.">
         <span aria-hidden="true">ⓘ</span>
-        <span>Hold <kbd>Shift</kbd> and click map features to select several.</span>
+        <span>Hold <kbd>Shift</kbd> or <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> and click features to select several.</span>
       </div>
 
       <nav className={`feature-editor-tabs ${multiple ? 'is-multi' : ''}`} aria-label="Feature editor sections">

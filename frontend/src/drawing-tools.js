@@ -21,6 +21,7 @@ const MULTI_SELECT_LINE = 'bottle-of-rhumb-multi-selection-line';
 const MULTI_SELECT_POINT = 'bottle-of-rhumb-multi-selection-point';
 const backgroundMarkerStates = new WeakMap();
 const previewPopups = new WeakMap();
+const selectionIntents = new WeakMap();
 
 export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionChange) {
   const draw = new MaplibreTerradrawControl({
@@ -34,17 +35,21 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
   ensureTextLayers(map);
   ensureMultiSelectionLayers(map);
   keepPointLayersAbovePolygons(map);
-  let shiftPressed = false;
-  const handleKeyDown = (event) => { if (event.key === 'Shift') shiftPressed = true; };
-  const handleKeyUp = (event) => { if (event.key === 'Shift') shiftPressed = false; };
-  const clearShift = () => { shiftPressed = false; };
+  const pressedSelectionKeys = new Set();
+  const selectionKeys = new Set(['Shift', 'Control', 'Meta']);
+  const handleKeyDown = (event) => {
+    if (selectionKeys.has(event.key)) pressedSelectionKeys.add(event.key);
+  };
+  const handleKeyUp = (event) => { pressedSelectionKeys.delete(event.key); };
+  const clearSelectionKeys = () => { pressedSelectionKeys.clear(); };
+  const isAdditiveSelection = () => pressedSelectionKeys.size > 0;
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
-  window.addEventListener('blur', clearShift);
+  window.addEventListener('blur', clearSelectionKeys);
   map.once('remove', () => {
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('keyup', handleKeyUp);
-    window.removeEventListener('blur', clearShift);
+    window.removeEventListener('blur', clearSelectionKeys);
   });
   backgroundMarkerStates.set(map, {
     engine,
@@ -79,11 +84,18 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
   });
   engine?.on('change', reportChange);
   engine?.on('select', (id) => {
-    onSelectionChange?.(id, { additive: shiftPressed });
+    const intendedAdditive = selectionIntents.get(draw);
+    selectionIntents.delete(draw);
+    onSelectionChange?.(id, {
+      additive: intendedAdditive ?? isAdditiveSelection(),
+    });
     reportChange();
   });
   engine?.on('deselect', () => {
-    if (!shiftPressed) onSelectionChange?.(null, { additive: false });
+    const intendedAdditive = selectionIntents.get(draw);
+    if (!(intendedAdditive ?? isAdditiveSelection())) {
+      onSelectionChange?.(null, { additive: false });
+    }
     reportChange();
   });
 
@@ -160,8 +172,10 @@ export function deleteLayerFeatures(draw, layerId) {
   if (ids.length > 0) engine.removeFeatures(ids);
 }
 
-export function selectFeature(draw, id) {
+export function selectFeature(draw, id, { additive } = {}) {
+  if (typeof additive === 'boolean') selectionIntents.set(draw, additive);
   draw?.getTerraDrawInstance()?.selectFeature(id);
+  queueMicrotask(() => selectionIntents.delete(draw));
 }
 
 export function updateFeature(draw, id, properties) {

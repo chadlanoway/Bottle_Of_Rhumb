@@ -254,7 +254,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   cursor: pointer;
   text-align: left;
 }
-.feature-list button:hover, .feature-list button.is-selected { background: rgba(30,144,255,.2); color: white; }
+.feature-list button:hover { background: rgba(30,144,255,.12); color: white; }
+.feature-list button.is-selected {
+  background: rgba(255, 209, 102, .14);
+  box-shadow: inset 3px 0 #ffd166;
+  color: white;
+}
+.feature-list button.is-primary {
+  background: rgba(30,144,255,.2);
+  box-shadow: inset 3px 0 var(--blue);
+}
 .empty-message { margin: 0; color: var(--muted); font-size: 13px; }
 .delete-layer-icon {
   display: grid;

@@ -251,9 +251,27 @@ export default function App() {
     setActiveLayerId(id);
   }
 
-  function handleSelectFeature(id) {
+  function handleSelectFeature(id, options = {}) {
     mapRef.current?.rhumbWeatherControl?.disableWeather();
-    selectFeature(drawRef.current, id);
+
+    if (options.rangeIds?.length) {
+      setSelectedFeatureIds((current) => {
+        const base = options.additiveRange ? current : [];
+        const combined = [...base, ...options.rangeIds];
+        const unique = combined.filter((candidate, index) => (
+          combined.findIndex((value) => String(value) === String(candidate)) === index
+        ));
+
+        return [
+          ...unique.filter((candidate) => String(candidate) !== String(id)),
+          id,
+        ];
+      });
+      selectFeature(drawRef.current, id, { additive: true });
+      return;
+    }
+
+    selectFeature(drawRef.current, id, options);
   }
 
   function handleSelectionChange(id, { additive = false } = {}) {
@@ -438,6 +456,7 @@ export default function App() {
         layers={layers}
         legend={legend}
         selectedFeatureId={selectedFeatureId}
+        selectedFeatureIds={selectedFeatureIds}
         savedView={savedView}
         viewMessage={viewMessage}
         onAddLayer={handleAddLayer}

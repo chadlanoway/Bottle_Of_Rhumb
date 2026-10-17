@@ -99,6 +99,7 @@ export default function Menu({
   legend,
   savedView,
   selectedFeatureId,
+  selectedFeatureIds,
   viewMessage,
   onAddLayer,
   onApplyGeoJSON,
@@ -163,6 +164,7 @@ export default function Menu({
               features={features}
               layers={layers}
               selectedFeatureId={selectedFeatureId}
+              selectedFeatureIds={selectedFeatureIds}
               onAddLayer={onAddLayer}
               onDeleteLayer={onDeleteLayer}
               onLayerChange={onLayerChange}
@@ -556,6 +558,7 @@ function LayersSection({
   features,
   layers,
   selectedFeatureId,
+  selectedFeatureIds,
   onAddLayer,
   onDeleteLayer,
   onLayerChange,
@@ -563,6 +566,35 @@ function LayersSection({
   onSelectFeature,
   onToggleLayer,
 }) {
+  const selectionAnchorRef = useRef(null);
+
+  function handleFeatureClick(event, featureId, layerFeatures) {
+    const ctrlPressed = event.ctrlKey || event.metaKey;
+
+    if (event.shiftKey) {
+      const anchorId = selectionAnchorRef.current ?? selectedFeatureId;
+      const anchorIndex = layerFeatures.findIndex(
+        (feature) => String(feature.id) === String(anchorId),
+      );
+      const clickedIndex = layerFeatures.findIndex(
+        (feature) => String(feature.id) === String(featureId),
+      );
+
+      if (anchorIndex >= 0 && clickedIndex >= 0) {
+        const first = Math.min(anchorIndex, clickedIndex);
+        const last = Math.max(anchorIndex, clickedIndex);
+        onSelectFeature(featureId, {
+          additiveRange: ctrlPressed,
+          rangeIds: layerFeatures.slice(first, last + 1).map((feature) => feature.id),
+        });
+        return;
+      }
+    }
+
+    selectionAnchorRef.current = featureId;
+    onSelectFeature(featureId, { additive: ctrlPressed || event.shiftKey });
+  }
+
   return (
     <div className="menu-section layers-section">
       <div className="section-heading-row">
@@ -575,9 +607,13 @@ function LayersSection({
             (feature) => (feature.properties?.layerId ?? layers[0]?.id) === layer.id,
           );
           const active = layer.id === activeLayerId;
+          const selectedIds = new Set((selectedFeatureIds ?? []).map(String));
+          const layerHasSelection = layerFeatures.some(
+            (feature) => selectedIds.has(String(feature.id)),
+          );
 
           return (
-            <section className={`layer-card ${active ? 'is-active' : ''}`} key={layer.id}>
+            <section className={`layer-card ${active ? 'is-active' : ''} ${layerHasSelection ? 'has-selection' : ''}`} key={layer.id}>
               <div className="layer-row">
                 <span className="active-layer-dot" aria-hidden="true" />
                 <button
@@ -606,7 +642,7 @@ function LayersSection({
                   <TrashIcon />
                 </button>
               </div>
-              {active && (
+              {(active || layerHasSelection) && (
                 <div className="layer-details">
                   <label className="field-label" htmlFor={`layer-${layer.id}`}>Layer name</label>
                   <input id={`layer-${layer.id}`} value={layer.name} onChange={(event) => onRenameLayer(layer.id, event.target.value)} />
@@ -617,10 +653,13 @@ function LayersSection({
                     <div className="feature-list">
                       {layerFeatures.map((feature, index) => (
                         <button
-                          className={String(feature.id) === String(selectedFeatureId) ? 'is-selected' : ''}
+                          className={[
+                            selectedIds.has(String(feature.id)) ? 'is-selected' : '',
+                            String(feature.id) === String(selectedFeatureId) ? 'is-primary' : '',
+                          ].filter(Boolean).join(' ')}
                           key={feature.id}
                           type="button"
-                          onClick={() => onSelectFeature(feature.id)}
+                          onClick={(event) => handleFeatureClick(event, feature.id, layerFeatures)}
                         >
                           <span aria-hidden="true">{featureIcon(feature)}</span>
                           <span>{featureListName(feature, index)}</span>
