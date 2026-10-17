@@ -60,10 +60,10 @@ export default function App() {
   const [legend, setLegend] = useState({
     visible: true,
     title: 'Legend',
-    position: 'top-right',
-    backgroundColor: '#ffffff',
+    position: 'bottom-right',
+    backgroundColor: '#172229',
     backgroundOpacity: 94,
-    textColor: '#172229',
+    textColor: '#ffffff',
     fontFamily: 'sans',
     glowEnabled: false,
     glowColor: '#1e90ff',
