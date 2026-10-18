@@ -254,6 +254,66 @@ export default function App() {
     handleStartRouting(profile, point);
   }
 
+  async function handleLocateDevice() {
+    try {
+      setError('');
+
+      if (!navigator.geolocation) {
+        throw new Error('Device location is not supported by this browser.');
+      }
+
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 30000,
+        });
+      });
+
+      const { longitude, latitude, accuracy } = position.coords;
+      mapRef.current?.flyTo({
+        center: [longitude, latitude],
+        zoom: Math.max(mapRef.current.getZoom(), 16),
+        essential: true,
+      });
+
+      const collection = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [longitude, latitude],
+          },
+          properties: {
+            name: 'Device location',
+            source: 'device-geolocation',
+            accuracyMeters: Math.round(accuracy),
+          },
+        }],
+      };
+
+      const added = addDerivedGeoJSON(
+        drawRef.current,
+        collection,
+        activeLayerIdRef.current,
+      );
+      setFeatures(added.collection.features);
+      return { ok: true };
+    } catch (caughtError) {
+      const messages = {
+        1: 'Location permission was denied.',
+        2: 'Your device location is currently unavailable.',
+        3: 'Finding your device location timed out.',
+      };
+      const message = messages[caughtError?.code]
+        || caughtError?.message
+        || 'Unable to find your device location.';
+      setError(message);
+      return { ok: false, error: message };
+    }
+  }
+
   async function handleImport(file) {
     try {
       setError('');
@@ -552,6 +612,7 @@ export default function App() {
         onDraw={handleDraw}
         onAddSearchPoint={handleAddSearchPoint}
         onAddressSearch={handleAddressSearch}
+        onLocateDevice={handleLocateDevice}
         onCancelRouting={() => routingControllerRef.current?.cancel()}
         onPreviewSearchResult={handlePreviewSearchResult}
         onSetView={handleSaveView}

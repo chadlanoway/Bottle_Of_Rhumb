@@ -59,6 +59,7 @@ export function EditorToolbar({
   featureCount,
   onAddSearchPoint,
   onAddressSearch,
+  onLocateDevice,
   onCancelRouting,
   onDelete,
   onDraw,
@@ -76,6 +77,7 @@ export function EditorToolbar({
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchMessage, setSearchMessage] = useState('');
+  const [locating, setLocating] = useState(false);
   const drawMenuRef = useRef(null);
 
   useEffect(() => {
@@ -107,6 +109,12 @@ export function EditorToolbar({
     setSearchResults([]);
     setSearchMessage('');
     setSearchQuery('');
+  }
+
+  async function locateDevice() {
+    setLocating(true);
+    await onLocateDevice();
+    setLocating(false);
   }
 
   return (
@@ -181,6 +189,18 @@ export function EditorToolbar({
           </div>
         )}
       </form>
+
+      <button
+        className="tool-button locate-device-button"
+        disabled={disabled || locating}
+        type="button"
+        onClick={locateDevice}
+        title="Find this device and add its position to the active layer"
+        aria-label="Find this device and add its position"
+      >
+        <span aria-hidden="true">{locating ? '…' : '◎'}</span>
+        <span className="locate-device-label">{locating ? 'Locating' : 'My location'}</span>
+      </button>
 
       {routingActive && (
         <button className="tool-button route-cancel-button" type="button" onClick={onCancelRouting} title="Cancel land routing">

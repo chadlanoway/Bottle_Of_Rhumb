@@ -291,6 +291,29 @@ select:focus-visible {
 }
 
 .route-cancel-button { border-color: #d99b85; background: #fff4ef; }
+
+.locate-device-button {
+  flex: 0 0 auto;
+  border-color: #a8c6c1;
+  background: #f2faf8;
+  color: #244b47;
+}
+
+.locate-device-button:hover:not(:disabled) {
+  border-color: #4c8f87;
+  background: #e3f4f0;
+}
+
+.locate-device-button > span:first-child {
+  font-size: 18px;
+  line-height: 1;
+}
+
+@media (max-width: 920px) {
+  .locate-device-label {
+    display: none;
+  }
+}
 .routing-status {
   position: absolute;
   top: calc(100% + 8px);
