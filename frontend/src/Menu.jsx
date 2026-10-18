@@ -8,6 +8,14 @@ const DRAW_ACTIONS = [
   { type: 'polygon', label: 'Polygon', icon: '⬡' },
   { type: 'text', label: 'Text', icon: 'T' },
   { type: 'circle', label: 'Circle', icon: '○' },
+  { type: 'land-route', label: 'Land route', icon: '⇢' },
+];
+
+const ROUTE_PROFILES = [
+  { value: 'foot-walking', label: 'Walking' },
+  { value: 'foot-hiking', label: 'Hiking' },
+  { value: 'cycling-regular', label: 'Cycling' },
+  { value: 'driving-car', label: 'Driving' },
 ];
 
 const geometryIcon = { Point: '●', LineString: '╱', Polygon: '⬡' };
@@ -49,28 +57,139 @@ export function EditorToolbar({
   activeLayer,
   disabled,
   featureCount,
+  onAddSearchPoint,
+  onAddressSearch,
+  onCancelRouting,
   onDelete,
   onDraw,
+  onPreviewSearchResult,
   onSetView,
+  onStartRouting,
+  onUseSearchAsRouteStart,
+  routingActive,
+  routingStatus,
   viewSaved,
 }) {
+  const [drawMenuOpen, setDrawMenuOpen] = useState(false);
+  const [routeProfile, setRouteProfile] = useState('foot-walking');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [searchMessage, setSearchMessage] = useState('');
+  const drawMenuRef = useRef(null);
+
+  useEffect(() => {
+    function closeDrawMenu(event) {
+      if (!drawMenuRef.current?.contains(event.target)) setDrawMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', closeDrawMenu);
+    return () => document.removeEventListener('pointerdown', closeDrawMenu);
+  }, []);
+
+  function chooseTool(type) {
+    setDrawMenuOpen(false);
+    if (type === 'land-route') onStartRouting(routeProfile);
+    else onDraw(type);
+  }
+
+  async function submitSearch(event) {
+    event.preventDefault();
+    setSearching(true);
+    setSearchMessage('');
+    const result = await onAddressSearch(searchQuery);
+    setSearching(false);
+    setSearchResults(result.results ?? []);
+    if (!result.ok) setSearchMessage(result.error);
+    else if (!result.results?.length) setSearchMessage('No matching places found.');
+  }
+
+  function clearSearch() {
+    setSearchResults([]);
+    setSearchMessage('');
+    setSearchQuery('');
+  }
+
   return (
     <div className="editor-toolbar" role="toolbar" aria-label="Map drawing tools">
-      <div className="tool-group">
-        {DRAW_ACTIONS.map((action) => (
-          <button
-            className="tool-button"
-            disabled={disabled}
-            key={action.type}
-            type="button"
-            onClick={() => onDraw(action.type)}
-            title={action.label}
-          >
-            <span aria-hidden="true">{action.icon}</span>
-            <span>{action.label}</span>
-          </button>
-        ))}
+      <div className="drawing-tools-menu" ref={drawMenuRef}>
+        <button
+          className={`tool-button drawing-tools-trigger ${drawMenuOpen ? 'is-active' : ''}`}
+          disabled={disabled}
+          type="button"
+          aria-expanded={drawMenuOpen}
+          onClick={() => setDrawMenuOpen((value) => !value)}
+        >
+          <span aria-hidden="true">✎</span>
+          <span>Drawing tools</span>
+          <span aria-hidden="true">▾</span>
+        </button>
+        {drawMenuOpen && (
+          <div className="drawing-tools-popover" role="menu">
+            {DRAW_ACTIONS.map((action) => (
+              <button
+                className="drawing-tool-option"
+                key={action.type}
+                type="button"
+                role="menuitem"
+                onClick={() => chooseTool(action.type)}
+              >
+                <span aria-hidden="true">{action.icon}</span>
+                <span>{action.label}</span>
+              </button>
+            ))}
+            <label className="drawing-route-profile">
+              <span>Land route type</span>
+              <select
+                value={routeProfile}
+                onChange={(event) => setRouteProfile(event.target.value)}
+              >
+                {ROUTE_PROFILES.map((profile) => (
+                  <option key={profile.value} value={profile.value}>{profile.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
       </div>
+
+      <form className="address-search" role="search" onSubmit={submitSearch}>
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search address or place"
+          aria-label="Search address or place"
+        />
+        <button disabled={disabled || searching || searchQuery.trim().length < 3} type="submit" title="Search">
+          {searching ? '…' : '⌕'}
+        </button>
+        {(searchResults.length > 0 || searchMessage) && (
+          <div className="address-search-results">
+            {searchMessage && <p>{searchMessage}</p>}
+            {searchResults.map((result) => (
+              <div className="address-search-result" key={result.id ?? result.label}>
+                <button className="search-result-main" type="button" onClick={() => onPreviewSearchResult(result)}>
+                  <strong>{result.name || result.label}</strong>
+                  {result.name && <span>{result.label}</span>}
+                </button>
+                <div className="search-result-actions">
+                  <button type="button" onClick={() => { onPreviewSearchResult(result); onAddSearchPoint(result); clearSearch(); }}>Add point</button>
+                  <button type="button" onClick={() => { onUseSearchAsRouteStart(result, routeProfile); clearSearch(); }}>Route from here</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </form>
+
+      {routingActive && (
+        <button className="tool-button route-cancel-button" type="button" onClick={onCancelRouting} title="Cancel land routing">
+          <span aria-hidden="true">×</span><span>Cancel route</span>
+        </button>
+      )}
+
+      {routingStatus && <span className="routing-status" role="status">{routingStatus}</span>}
+
       <div className="toolbar-divider" />
       <button className={`tool-button view-tool ${viewSaved ? 'is-saved' : ''}`} disabled={disabled} type="button" onClick={onSetView} title="Save the opening view for the shared map">
         <FrameIcon />

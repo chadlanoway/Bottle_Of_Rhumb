@@ -25,6 +25,12 @@ import {
   updateFeature,
 } from './drawing-tools.js';
 import { runGeometryOperation } from './geometry-operations.js';
+import {
+  createLandRoutingController,
+  searchAddresses,
+  searchResultPoint,
+  showSearchResult,
+} from './routing-tools.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -40,6 +46,7 @@ function makeLayer(id, name, index = 0) {
 }
 
 const DEFAULT_LAYER = makeLayer('default-layer', 'Untitled layer');
+const LAND_ROUTING_API_URL = import.meta.env.VITE_LAND_ROUTING_API_URL ?? '';
 
 export default function App() {
   const mapContainerRef = useRef(null);
@@ -47,6 +54,8 @@ export default function App() {
   const drawRef = useRef(null);
   const activeLayerIdRef = useRef(DEFAULT_LAYER.id);
   const dragDepthRef = useRef(0);
+  const routingControllerRef = useRef(null);
+  const searchMarkerRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const [features, setFeatures] = useState([]);
   const [layers, setLayers] = useState([DEFAULT_LAYER]);
@@ -57,12 +66,14 @@ export default function App() {
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [basemapId, setBasemapId] = useState('positron');
+  const [routingActive, setRoutingActive] = useState(false);
+  const [routingStatus, setRoutingStatus] = useState('');
   const [legend, setLegend] = useState({
     visible: true,
     title: 'Legend',
     position: 'bottom-right',
     backgroundColor: '#172229',
-    backgroundOpacity: 94,
+    backgroundOpacity: 90,
     textColor: '#ffffff',
     fontFamily: 'sans',
     glowEnabled: false,
@@ -92,7 +103,11 @@ export default function App() {
       setError(caughtError.message);
     }
 
-    return () => mapRef.current?.remove();
+    return () => {
+      routingControllerRef.current?.destroy();
+      searchMarkerRef.current?.remove();
+      mapRef.current?.remove();
+    };
   }, []);
 
   function mountMap(nextBasemapId, restoredFeatures, restoredLayers, restoredSelection) {
@@ -107,6 +122,13 @@ export default function App() {
         handleSelectionChange,
       );
       drawRef.current = draw;
+      routingControllerRef.current = createLandRoutingController(map, {
+        apiUrl: LAND_ROUTING_API_URL,
+        onActiveChange: setRoutingActive,
+        onError: (caughtError) => setError(caughtError.message),
+        onRoute: handleRouteReady,
+        onStatus: setRoutingStatus,
+      });
 
       if (restoredFeatures.length > 0) {
         restoreGeoJSON(
@@ -148,8 +170,88 @@ export default function App() {
   function handleDraw(type) {
     setError('');
     setSelectedFeatureIds([]);
+    routingControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, type);
+  }
+
+  function handleStartRouting(profile, presetStart = null) {
+    setError('');
+    setSelectedFeatureIds([]);
+    mapRef.current?.rhumbWeatherControl?.disableWeather();
+    startDrawing(drawRef.current, 'select');
+    routingControllerRef.current?.arm(profile, presetStart);
+  }
+
+  async function handleRouteReady(payload, profile) {
+    const summary = payload.summary ?? {};
+    const collection = {
+      ...payload.route,
+      features: payload.route.features.map((feature, index) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          name: feature.properties?.name ?? `Land route${index ? ` ${index + 1}` : ''}`,
+          routeProfile: profile,
+          routeDistanceMeters: summary.distance_meters ?? null,
+          routeDurationSeconds: summary.duration_seconds ?? null,
+          source: 'openrouteservice',
+        },
+      })),
+    };
+    const added = addDerivedGeoJSON(drawRef.current, collection, activeLayerIdRef.current);
+    setFeatures(added.collection.features);
+  }
+
+  async function handleAddressSearch(query) {
+    try {
+      setError('');
+      return { ok: true, results: await searchAddresses(LAND_ROUTING_API_URL, query) };
+    } catch (caughtError) {
+      setError(caughtError.message);
+      return { ok: false, error: caughtError.message, results: [] };
+    }
+  }
+
+  function handlePreviewSearchResult(result) {
+    searchMarkerRef.current = showSearchResult(
+      mapRef.current,
+      result,
+      searchMarkerRef.current,
+    );
+  }
+
+  function handleAddSearchPoint(result) {
+    try {
+      const point = searchResultPoint(result);
+      const collection = {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+          properties: {
+            name: result.name || result.label || 'Search result',
+            address: result.label || '',
+            source: 'address-search',
+          },
+        }],
+      };
+      const added = addDerivedGeoJSON(drawRef.current, collection, activeLayerIdRef.current);
+      setFeatures(added.collection.features);
+      searchMarkerRef.current?.remove();
+      searchMarkerRef.current = null;
+      return { ok: true };
+    } catch (caughtError) {
+      setError(caughtError.message);
+      return { ok: false, error: caughtError.message };
+    }
+  }
+
+  function handleUseSearchAsRouteStart(result, profile) {
+    const point = searchResultPoint(result);
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
+    handleStartRouting(profile, point);
   }
 
   async function handleImport(file) {
@@ -387,6 +489,10 @@ export default function App() {
     const restoredSelection = [...selectedFeatureIds];
 
     setMapReady(false);
+    routingControllerRef.current?.destroy();
+    routingControllerRef.current = null;
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
     mapRef.current.rhumbWeatherControl?.disableWeather();
     mapRef.current.remove();
     drawRef.current = null;
@@ -444,7 +550,15 @@ export default function App() {
         featureCount={features.length}
         onDelete={handleDeleteFeature}
         onDraw={handleDraw}
+        onAddSearchPoint={handleAddSearchPoint}
+        onAddressSearch={handleAddressSearch}
+        onCancelRouting={() => routingControllerRef.current?.cancel()}
+        onPreviewSearchResult={handlePreviewSearchResult}
         onSetView={handleSaveView}
+        onStartRouting={handleStartRouting}
+        onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
+        routingActive={routingActive}
+        routingStatus={routingStatus}
         viewSaved={Boolean(savedView)}
       />
       <Menu

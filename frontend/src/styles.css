@@ -158,6 +158,171 @@ select:focus-visible {
   gap: 4px;
 }
 
+.drawing-tools-menu,
+.address-search {
+  position: relative;
+}
+
+.drawing-tools-trigger.is-active {
+  border-color: #8baeba;
+  background: white;
+}
+
+.drawing-tools-popover {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  left: 0;
+  display: grid;
+  width: 210px;
+  padding: 6px;
+  border: 1px solid #b8c8cf;
+  border-radius: 8px;
+  background: #f7fafb;
+  box-shadow: 0 12px 28px rgba(20, 36, 44, .24);
+}
+
+.drawing-tool-option {
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  align-items: center;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #172229;
+  cursor: pointer;
+  text-align: left;
+}
+
+.drawing-tool-option:hover { background: #e7f0f3; }
+
+.drawing-route-profile {
+  display: grid;
+  gap: 4px;
+  margin-top: 5px;
+  padding: 8px 9px 4px;
+  border-top: 1px solid #d6e0e4;
+  color: #52666f;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.drawing-route-profile select {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #b8c8cf;
+  border-radius: 5px;
+  background: white;
+  color: #172229;
+  text-transform: none;
+}
+
+.address-search {
+  display: flex;
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.address-search > input {
+  width: 100%;
+  min-width: 150px;
+  height: 36px;
+  padding: 7px 38px 7px 11px;
+  border: 1px solid #b7c8d1;
+  border-radius: 6px;
+  background: white;
+  color: #172229;
+}
+
+.address-search > button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 34px;
+  height: 32px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #315967;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.address-search-results {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  left: 0;
+  width: min(430px, calc(100vw - 24px));
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid #b8c8cf;
+  border-radius: 8px;
+  background: #f7fafb;
+  box-shadow: 0 12px 28px rgba(20, 36, 44, .24);
+}
+
+.address-search-results > p { margin: 8px; color: #647881; font-size: 13px; }
+.address-search-result { padding: 5px; border-bottom: 1px solid #dce5e8; }
+.address-search-result:last-child { border-bottom: 0; }
+.search-result-main {
+  display: grid;
+  width: 100%;
+  gap: 2px;
+  padding: 5px;
+  border: 0;
+  background: transparent;
+  color: #172229;
+  cursor: pointer;
+  text-align: left;
+}
+.search-result-main span { color: #61747c; font-size: 12px; }
+.search-result-actions { display: flex; gap: 5px; padding: 4px 5px; }
+.search-result-actions button {
+  padding: 5px 8px;
+  border: 1px solid #b7c8d1;
+  border-radius: 5px;
+  background: white;
+  color: #244d5c;
+  cursor: pointer;
+}
+
+.route-cancel-button { border-color: #d99b85; background: #fff4ef; }
+.routing-status {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 55;
+  max-width: min(520px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border: 1px solid rgba(72, 100, 112, .35);
+  border-radius: 99px;
+  background: rgba(23, 34, 41, .92);
+  color: white;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
+  font-size: 13px;
+}
+
+.route-endpoint-marker,
+.search-result-marker {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #1e90ff;
+  color: white;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
+  font: 800 13px/1 sans-serif;
+}
+.route-end-marker { background: #e06c5b; }
+.search-result-marker { width: 32px; height: 32px; background: #18866b; font-size: 18px; }
+
 .tool-button {
   display: flex;
   min-height: 38px;
