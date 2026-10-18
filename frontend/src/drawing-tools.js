@@ -979,3 +979,20 @@ function formatNauticalMiles(distance) {
   if (distance < 100) return `${distance.toFixed(1)} nm`;
   return `${Math.round(distance)} nm`;
 }
+
+export function removeFeatureAppearanceLayers(map) {
+  if (!map) return;
+
+  const layerIds = [
+    'bottle-of-rhumb-dashed-lines',
+    'bottle-of-rhumb-dotted-lines',
+    'bottle-of-rhumb-dashed-polygons',
+    'bottle-of-rhumb-dotted-polygons',
+  ];
+
+  for (const layerId of layerIds) {
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+  }
+}

@@ -15,6 +15,7 @@ import {
   deleteLayerFeatures,
   exportGeoJSON,
   previewFeaturePopup,
+  removeFeatureAppearanceLayers,
   replaceGeoJSON,
   restoreGeoJSON,
   selectFeature,
@@ -125,7 +126,11 @@ export default function App() {
     return () => {
       routingControllerRef.current?.destroy();
       searchMarkerRef.current?.remove();
-      mapRef.current?.remove();
+
+      if (mapRef.current) {
+        removeFeatureAppearanceLayers(mapRef.current);
+        mapRef.current.remove();
+      }
     };
   }, []);
 
@@ -619,6 +624,7 @@ export default function App() {
     searchMarkerRef.current?.remove();
     searchMarkerRef.current = null;
     mapRef.current.rhumbWeatherControl?.disableWeather();
+    removeFeatureAppearanceLayers(mapRef.current);
     mapRef.current.remove();
     drawRef.current = null;
     mapRef.current = null;
