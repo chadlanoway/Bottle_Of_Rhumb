@@ -37,7 +37,7 @@ export function createMap(container, basemapId = 'positron') {
   const map = new maplibregl.Map({
     container,
     style: getBasemap(basemapId).style,
-    center: [-96, 38],
+    center: [3, 60],
     zoom: 3,
     attributionControl: true,
   });
