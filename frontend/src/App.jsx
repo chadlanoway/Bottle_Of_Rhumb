@@ -99,6 +99,23 @@ export default function App() {
   }, [features, layers, selectedFeatureId, selectedFeatureIds]);
 
   useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+    container.style.setProperty(
+      '--reference-popup-background',
+      hexToRgba(legend.backgroundColor, legend.backgroundOpacity / 100),
+    );
+    container.style.setProperty('--reference-popup-text', legend.textColor);
+    container.style.setProperty('--reference-popup-font', legendFontFamily(legend.fontFamily));
+    container.style.setProperty(
+      '--reference-popup-shadow',
+      legend.glowEnabled
+        ? `0 0 ${legend.glowSize}px ${legend.glowColor}, 0 5px 18px rgba(0,0,0,.2)`
+        : '0 5px 18px rgba(0,0,0,.2)',
+    );
+  }, [legend]);
+
+  useEffect(() => {
     try {
       mountMap(basemapId, [], [DEFAULT_LAYER], null);
     } catch (caughtError) {
@@ -113,7 +130,9 @@ export default function App() {
   }, []);
 
   function mountMap(nextBasemapId, restoredFeatures, restoredLayers, restoredSelection) {
-    const map = createMap(mapContainerRef.current, nextBasemapId);
+    const map = createMap(mapContainerRef.current, nextBasemapId, {
+      onAddReferencePoint: handleAddReferencePoint,
+    });
     mapRef.current = map;
 
     map.on('load', () => {
@@ -246,6 +265,24 @@ export default function App() {
     } catch (caughtError) {
       setError(caughtError.message);
       return { ok: false, error: caughtError.message };
+    }
+  }
+
+  function handleAddReferencePoint(feature) {
+    try {
+      setError('');
+      const collection = { type: 'FeatureCollection', features: [feature] };
+      const added = addDerivedGeoJSON(drawRef.current, collection, activeLayerIdRef.current);
+      setFeatures(added.collection.features);
+      const addedId = added.addedIds.at(-1);
+      if (addedId !== undefined) {
+        selectFeature(drawRef.current, addedId);
+        setSelectedFeatureIds([addedId]);
+      }
+      return { ok: true, id: addedId };
+    } catch (caughtError) {
+      setError(caughtError.message);
+      throw caughtError;
     }
   }
 

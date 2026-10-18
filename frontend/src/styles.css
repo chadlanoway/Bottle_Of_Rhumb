@@ -2080,6 +2080,93 @@ button:disabled {
   border-top: 1px solid var(--panel-border) !important;
 }
 
+.rhumb-map-controls .rhumb-control-ports,
+.rhumb-map-controls .rhumb-control-marinas {
+  font-size: 17px;
+}
+
+.rhumb-map-controls .rhumb-control-reference-start {
+  margin-top: 3px;
+  border-top: 1px solid var(--panel-border) !important;
+}
+
+.reference-place-popup {
+  display: grid;
+  max-height: 390px;
+  gap: 9px;
+  overflow: auto;
+  color: inherit;
+  font: 14px/1.35 system-ui, sans-serif;
+}
+
+.reference-place-popup h3 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.reference-place-popup dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.reference-place-popup dl div {
+  display: grid;
+  grid-template-columns: minmax(90px, .8fr) minmax(110px, 1.2fr);
+  gap: 8px;
+}
+
+.reference-place-popup dt { font-weight: 700; }
+.reference-place-popup dd { margin: 0; overflow-wrap: anywhere; }
+
+.reference-place-add {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: var(--green);
+  color: #06121a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.reference-place-add:hover:not(:disabled) { filter: brightness(1.12); }
+.reference-place-add:disabled { opacity: .68; cursor: default; }
+.reference-place-status { min-height: 1em; margin: 0; color: #a43f36; font-size: 12px; }
+
+.reference-place-map-popup .maplibregl-popup-content {
+  background: var(--reference-popup-background);
+  color: var(--reference-popup-text);
+  font-family: var(--reference-popup-font);
+  box-shadow: var(--reference-popup-shadow);
+}
+
+.reference-place-map-popup .maplibregl-popup-close-button {
+  color: var(--reference-popup-text);
+}
+
+.reference-place-map-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.reference-place-map-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.reference-place-map-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--reference-popup-background);
+}
+
+.reference-place-map-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.reference-place-map-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.reference-place-map-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--reference-popup-background);
+}
+
+.reference-place-map-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--reference-popup-background);
+}
+
+.reference-place-map-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--reference-popup-background);
+}
+
 .rhumb-map-controls .rhumb-control-button.is-active {
   background: var(--blue) !important;
   color: #06121a;

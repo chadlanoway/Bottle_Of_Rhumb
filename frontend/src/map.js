@@ -2,6 +2,7 @@ import * as maplibregl from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { RhumbMapControl } from './weather-controls.js';
+import { ReferencePlacesControl } from './reference-places.js';
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl);
 globalThis.mapboxgl ??= maplibregl;
@@ -33,7 +34,7 @@ export const BASEMAPS = [
   },
 ];
 
-export function createMap(container, basemapId = 'positron') {
+export function createMap(container, basemapId = 'positron', options = {}) {
   const map = new maplibregl.Map({
     container,
     style: getBasemap(basemapId).style,
@@ -45,6 +46,11 @@ export function createMap(container, basemapId = 'positron') {
   const weatherControl = new RhumbMapControl();
   map.addControl(weatherControl, 'top-right');
   map.rhumbWeatherControl = weatherControl;
+  map.rhumbReferencePlaces = new ReferencePlacesControl(
+    map,
+    weatherControl,
+    options.onAddReferencePoint,
+  );
 
   map.addControl(
     new maplibregl.ScaleControl({ maxWidth: 120, unit: 'imperial' }),
