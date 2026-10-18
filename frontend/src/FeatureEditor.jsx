@@ -24,6 +24,17 @@ const RESERVED_PROPERTIES = new Set([
   'popupTitle',
   'popupDescription',
   'popupFields',
+  'popupImageUrl',
+  'popupImageKey',
+  'popupImageAlt',
+  'popupImageCaption',
+  'popupBackgroundColor',
+  'popupBackgroundOpacity',
+  'popupTextColor',
+  'popupFontFamily',
+  'popupGlowEnabled',
+  'popupGlowColor',
+  'popupGlowSize',
 ]);
 
 const FONT_OPTIONS = [
@@ -32,7 +43,7 @@ const FONT_OPTIONS = [
   { value: 'mono', label: 'Monospace' },
 ];
 
-export default function FeatureEditor({ feature, features = [], onDelete, onGeometryOperation, onPreview, onUpdate }) {
+export default function FeatureEditor({ feature, features = [], legend, onDelete, onGeometryOperation, onImageUpload, onPreview, onUpdate }) {
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [rows, setRows] = useState([]);
@@ -187,7 +198,7 @@ export default function FeatureEditor({ feature, features = [], onDelete, onGeom
         )}
 
         {!multiple && activeTab === 'popup' && (
-          <PopupControls feature={feature} onPreview={onPreview} onUpdate={onUpdate} />
+          <PopupControls feature={feature} legend={legend} onImageUpload={onImageUpload} onPreview={onPreview} onUpdate={onUpdate} />
         )}
 
         {activeTab === 'geometry' && (
@@ -257,9 +268,18 @@ function GeometryControls({ feature, selectionCount, onRun }) {
   );
 }
 
-function PopupControls({ feature, onPreview, onUpdate }) {
+function PopupControls({ feature, legend, onImageUpload, onPreview, onUpdate }) {
   const properties = feature.properties ?? {};
   const enabled = properties.popupEnabled === true;
+  const backgroundColor = properties.popupBackgroundColor ?? legend?.backgroundColor ?? '#172229';
+  const backgroundOpacity = properties.popupBackgroundOpacity ?? legend?.backgroundOpacity ?? 90;
+  const textColor = properties.popupTextColor ?? legend?.textColor ?? '#ffffff';
+  const fontFamily = properties.popupFontFamily ?? legend?.fontFamily ?? 'sans';
+  const glowEnabled = properties.popupGlowEnabled ?? legend?.glowEnabled ?? false;
+  const glowColor = properties.popupGlowColor ?? legend?.glowColor ?? '#1e90ff';
+  const glowSize = properties.popupGlowSize ?? legend?.glowSize ?? 18;
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState('');
   const selectedFields = Array.isArray(properties.popupFields) ? properties.popupFields : [];
   const availableFields = Object.keys(properties).filter(
     (key) => !RESERVED_PROPERTIES.has(key),
@@ -270,6 +290,40 @@ function PopupControls({ feature, onPreview, onUpdate }) {
       ? [...new Set([...selectedFields, key])]
       : selectedFields.filter((field) => field !== key);
     onUpdate({ popupFields: next });
+  }
+
+  async function uploadImage(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    setUploadMessage('');
+    const result = await onImageUpload(file);
+    setUploading(false);
+    setUploadMessage(result?.ok ? 'Image uploaded.' : result?.error || 'Image upload failed.');
+  }
+
+  function removeImage() {
+    onUpdate({
+      popupImageUrl: undefined,
+      popupImageKey: undefined,
+      popupImageAlt: undefined,
+      popupImageCaption: undefined,
+    });
+    setUploadMessage('Image removed from this popup.');
+  }
+
+  function resetAppearance() {
+    onUpdate({
+      popupBackgroundColor: undefined,
+      popupBackgroundOpacity: undefined,
+      popupTextColor: undefined,
+      popupFontFamily: undefined,
+      popupGlowEnabled: undefined,
+      popupGlowColor: undefined,
+      popupGlowSize: undefined,
+    });
   }
 
   return (
@@ -301,6 +355,139 @@ function PopupControls({ feature, onPreview, onUpdate }) {
             placeholder="What should the popup tell viewers?"
             onChange={(event) => onUpdate({ popupDescription: event.target.value })}
           />
+
+          <div className="popup-image-controls">
+            <div className="popup-image-heading">
+              <div>
+                <strong>Popup image</strong>
+                <span>JPEG, PNG, or WebP up to 8 MB.</span>
+              </div>
+              <label className={`popup-image-upload-button ${uploading ? 'is-disabled' : ''}`}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={uploading}
+                  onChange={uploadImage}
+                />
+                {uploading ? 'Uploading…' : properties.popupImageUrl ? 'Replace image' : 'Add image'}
+              </label>
+            </div>
+
+            {properties.popupImageUrl && (
+              <div className="popup-image-preview">
+                <img src={properties.popupImageUrl} alt={properties.popupImageAlt || 'Popup image preview'} />
+                <button type="button" onClick={removeImage}>Remove image</button>
+              </div>
+            )}
+
+            {properties.popupImageUrl && (
+              <div className="popup-image-fields">
+                <label>
+                  <span className="field-label">Alternative text</span>
+                  <input
+                    value={properties.popupImageAlt ?? ''}
+                    placeholder="Describe the image for accessibility"
+                    onChange={(event) => onUpdate({ popupImageAlt: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span className="field-label">Caption</span>
+                  <input
+                    value={properties.popupImageCaption ?? ''}
+                    placeholder="Optional image caption"
+                    onChange={(event) => onUpdate({ popupImageCaption: event.target.value })}
+                  />
+                </label>
+              </div>
+            )}
+
+            {uploadMessage && <p className="popup-image-message" role="status">{uploadMessage}</p>}
+          </div>
+
+          <fieldset className="popup-appearance-fieldset">
+            <legend>Appearance</legend>
+            
+
+            <div className="popup-appearance-grid">
+              <label>
+                <span className="field-label">Background</span>
+                <input
+                  className="legend-color-input"
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(event) => onUpdate({ popupBackgroundColor: event.target.value })}
+                />
+              </label>
+              <label>
+                <span className="field-label">Text color</span>
+                <input
+                  className="legend-color-input"
+                  type="color"
+                  value={textColor}
+                  onChange={(event) => onUpdate({ popupTextColor: event.target.value })}
+                />
+              </label>
+              <label>
+                <span className="field-label">Font</span>
+                <select
+                  value={fontFamily}
+                  onChange={(event) => onUpdate({ popupFontFamily: event.target.value })}
+                >
+                  {FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="legend-range-field">
+              <span>Background opacity</span>
+              <input
+                type="range"
+                min="20"
+                max="100"
+                step="1"
+                value={backgroundOpacity}
+                onChange={(event) => onUpdate({ popupBackgroundOpacity: Number(event.target.value) })}
+              />
+              <output>{backgroundOpacity}%</output>
+            </label>
+
+            <label className="legend-glow-toggle">
+              <input
+                type="checkbox"
+                checked={glowEnabled}
+                onChange={(event) => onUpdate({ popupGlowEnabled: event.target.checked })}
+              />
+              <span>Box glow</span>
+            </label>
+
+            {glowEnabled && (
+              <div className="popup-glow-options">
+                <label>
+                  <span className="field-label">Glow color</span>
+                  <input
+                    className="legend-color-input"
+                    type="color"
+                    value={glowColor}
+                    onChange={(event) => onUpdate({ popupGlowColor: event.target.value })}
+                  />
+                </label>
+                <label className="legend-range-field">
+                  <span>Glow size</span>
+                  <input
+                    type="range"
+                    min="4"
+                    max="40"
+                    step="1"
+                    value={glowSize}
+                    onChange={(event) => onUpdate({ popupGlowSize: Number(event.target.value) })}
+                  />
+                  <output>{glowSize}px</output>
+                </label>
+              </div>
+            )}
+          </fieldset>
 
           <p className="field-label popup-fields-heading">Properties to display</p>
           {availableFields.length === 0 ? (

@@ -31,6 +31,7 @@ import {
   searchResultPoint,
   showSearchResult,
 } from './routing-tools.js';
+import { uploadPopupImage } from './image-upload.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -47,6 +48,7 @@ function makeLayer(id, name, index = 0) {
 
 const DEFAULT_LAYER = makeLayer('default-layer', 'Untitled layer');
 const LAND_ROUTING_API_URL = import.meta.env.VITE_LAND_ROUTING_API_URL ?? '';
+const IMAGE_UPLOAD_API_URL = import.meta.env.VITE_IMAGE_UPLOAD_API_URL ?? '';
 
 export default function App() {
   const mapContainerRef = useRef(null);
@@ -252,6 +254,32 @@ export default function App() {
     searchMarkerRef.current?.remove();
     searchMarkerRef.current = null;
     handleStartRouting(profile, point);
+  }
+
+  async function handlePopupImageUpload(file) {
+    if (!selectedFeature) {
+      return { ok: false, error: 'Select a feature before uploading an image.' };
+    }
+
+    try {
+      setError('');
+      const image = await uploadPopupImage(
+        IMAGE_UPLOAD_API_URL,
+        file,
+        selectedFeature.id,
+      );
+      updateFeature(drawRef.current, selectedFeature.id, {
+        popupImageUrl: image.imageUrl,
+        popupImageKey: image.imageKey,
+        popupImageAlt: selectedFeature.properties?.popupImageAlt || '',
+        popupImageCaption: selectedFeature.properties?.popupImageCaption || '',
+      });
+      return { ok: true, image };
+    } catch (caughtError) {
+      const message = caughtError.message || 'Image upload failed.';
+      setError(message);
+      return { ok: false, error: message };
+    }
   }
 
   async function handleLocateDevice() {
@@ -654,9 +682,11 @@ export default function App() {
       <FeatureEditor
         feature={selectedFeature}
         features={selectedFeatures}
+        legend={legend}
         onDelete={handleDeleteFeature}
         onGeometryOperation={handleGeometryOperation}
-        onPreview={() => previewFeaturePopup(drawRef.current, mapRef.current, selectedFeatureId)}
+        onImageUpload={handlePopupImageUpload}
+        onPreview={() => previewFeaturePopup(drawRef.current, mapRef.current, selectedFeatureId, legend)}
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
       />
 

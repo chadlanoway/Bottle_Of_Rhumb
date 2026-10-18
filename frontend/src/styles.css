@@ -1129,8 +1129,8 @@ select:focus-visible {
 
 .feature-popup-content {
   min-width: 180px;
-  color: #172229;
-  font-family: Arial, sans-serif;
+  color: inherit;
+  font-family: inherit;
 }
 
 .feature-popup-content h3 {
@@ -1142,6 +1142,218 @@ select:focus-visible {
   margin: 0 0 9px;
   line-height: 1.4;
   white-space: pre-wrap;
+}
+
+.popup-image-controls {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: #f7fafb;
+}
+
+.popup-image-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.popup-image-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.popup-image-heading span,
+.popup-image-message {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.popup-image-upload-button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid #8bb7b0;
+  border-radius: 7px;
+  background: #eaf6f3;
+  color: #244b47;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.popup-image-upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.popup-image-upload-button.is-disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.popup-image-preview {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #dfe8ea;
+}
+
+.popup-image-preview img {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  object-fit: cover;
+}
+
+.popup-image-preview button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(23, 34, 41, .86);
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.popup-image-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.popup-image-fields label {
+  display: grid;
+  gap: 4px;
+}
+
+.popup-image-message {
+  margin: 0;
+}
+
+.popup-appearance-fieldset {
+  display: grid;
+  gap: 11px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.popup-appearance-fieldset > legend {
+  padding: 0 5px;
+  font-weight: 700;
+}
+
+.popup-appearance-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.popup-appearance-heading button {
+  padding: 5px 7px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.popup-appearance-grid {
+  display: grid;
+  grid-template-columns: auto auto minmax(110px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.popup-appearance-grid label,
+.popup-glow-options > label {
+  display: grid;
+  gap: 4px;
+}
+
+.popup-glow-options {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.feature-styled-popup .maplibregl-popup-close-button {
+  color: inherit;
+}
+
+.feature-styled-popup .maplibregl-popup-content {
+  overflow: visible;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .2) !important;
+}
+
+.feature-styled-popup.has-popup-glow .maplibregl-popup-content {
+  box-shadow:
+    0 0 var(--feature-popup-glow-size) var(--feature-popup-glow-color),
+    0 5px 18px rgba(0, 0, 0, .24) !important;
+}
+
+.feature-styled-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.feature-styled-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.feature-styled-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--feature-popup-background);
+}
+
+.feature-styled-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.feature-styled-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.feature-styled-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--feature-popup-background);
+}
+
+.feature-styled-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--feature-popup-background);
+}
+
+.feature-styled-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--feature-popup-background);
+}
+
+@media (max-width: 520px) {
+  .popup-appearance-grid {
+    grid-template-columns: auto auto;
+  }
+
+  .popup-appearance-grid label:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.feature-popup-image {
+  margin: 0 0 9px;
+}
+
+.feature-popup-image img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.feature-popup-image figcaption {
+  margin-top: 4px;
+  color: inherit;
+  opacity: .78;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .feature-popup-content dl {

@@ -183,7 +183,7 @@ export function updateFeature(draw, id, properties) {
   engine?.updateFeatureProperties(id, properties);
 }
 
-export function previewFeaturePopup(draw, map, id) {
+export function previewFeaturePopup(draw, map, id, styleDefaults = {}) {
   if (!draw || !map || id === null || id === undefined) return;
   const feature = draw.getTerraDrawInstance()?.getSnapshot().find(
     (candidate) => String(candidate.id) === String(id),
@@ -195,6 +195,7 @@ export function previewFeaturePopup(draw, map, id) {
     .setLngLat(popupCoordinates(feature, map))
     .setDOMContent(buildPopupElement(feature.properties))
     .addTo(map);
+  applyPopupStyle(popup, feature.properties, styleDefaults);
   previewPopups.set(map, popup);
 }
 
@@ -593,6 +594,25 @@ function buildPopupElement(properties) {
   }
 
   const description = properties.popupDescription || properties.description;
+
+  if (isSafeImageUrl(properties.popupImageUrl)) {
+    const figure = document.createElement('figure');
+    figure.className = 'feature-popup-image';
+    const image = document.createElement('img');
+    image.src = properties.popupImageUrl;
+    image.alt = properties.popupImageAlt || '';
+    image.loading = 'lazy';
+    figure.appendChild(image);
+
+    if (properties.popupImageCaption) {
+      const caption = document.createElement('figcaption');
+      caption.textContent = properties.popupImageCaption;
+      figure.appendChild(caption);
+    }
+
+    container.appendChild(figure);
+  }
+
   if (description) {
     const paragraph = document.createElement('p');
     paragraph.textContent = description;
@@ -616,6 +636,49 @@ function buildPopupElement(properties) {
   }
 
   return container;
+}
+
+function applyPopupStyle(popup, properties, defaults) {
+  const backgroundColor = properties.popupBackgroundColor ?? defaults.backgroundColor ?? '#172229';
+  const opacity = properties.popupBackgroundOpacity ?? defaults.backgroundOpacity ?? 90;
+  const textColor = properties.popupTextColor ?? defaults.textColor ?? '#ffffff';
+  const fontFamily = properties.popupFontFamily ?? defaults.fontFamily ?? 'sans';
+  const glowEnabled = properties.popupGlowEnabled ?? defaults.glowEnabled ?? false;
+  const glowColor = properties.popupGlowColor ?? defaults.glowColor ?? '#1e90ff';
+  const glowSize = properties.popupGlowSize ?? defaults.glowSize ?? 18;
+  const background = hexToRgba(backgroundColor, Number(opacity) / 100);
+  const element = popup.getElement();
+  const content = element?.querySelector('.maplibregl-popup-content');
+  if (!element || !content) return;
+
+  element.classList.add('feature-styled-popup');
+  element.classList.toggle('has-popup-glow', Boolean(glowEnabled));
+  element.style.setProperty('--feature-popup-background', background);
+  element.style.setProperty('--feature-popup-glow-color', glowColor);
+  element.style.setProperty('--feature-popup-glow-size', `${Number(glowSize)}px`);
+  content.style.backgroundColor = background;
+  content.style.color = textColor;
+  content.style.fontFamily = cssFontFamily(fontFamily);
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = String(hex || '').replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((character) => character + character).join('')
+    : normalized;
+  if (!/^[0-9a-f]{6}$/i.test(full)) return `rgba(23, 34, 41, ${alpha})`;
+  const value = Number.parseInt(full, 16);
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
+}
+
+function isSafeImageUrl(value) {
+  if (typeof value !== 'string' || !value) return false;
+  try {
+    const url = new URL(value, window.location.href);
+    return url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost');
+  } catch {
+    return false;
+  }
 }
 
 function formatPopupValue(value) {
