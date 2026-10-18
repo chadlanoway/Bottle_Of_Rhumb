@@ -100,6 +100,14 @@ export class RhumbMapControl {
     this.featureOverlay?.setData(features, hiddenLayerIds, selectedFeatureId);
   }
 
+  setReferencePlacesProvider(provider) {
+    this.featureOverlay?.setReferencePlacesProvider(provider);
+  }
+
+  redrawFeatureOverlay() {
+    this.featureOverlay?.scheduleDraw();
+  }
+
   async disableWeather() {
     if (!this.mode || !this.weather) return;
     await this.weather.setMode(null);
@@ -171,6 +179,7 @@ class WeatherFeatureOverlay {
     this.features = [];
     this.hiddenLayerIds = new Set();
     this.selectedFeatureId = null;
+    this.referencePlacesProvider = null;
     this.visible = false;
     this.frame = null;
     this.canvas = document.createElement('canvas');
@@ -188,6 +197,11 @@ class WeatherFeatureOverlay {
     this.features = Array.isArray(features) ? features : [];
     this.hiddenLayerIds = new Set(hiddenLayerIds);
     this.selectedFeatureId = selectedFeatureId;
+    this.scheduleDraw();
+  }
+
+  setReferencePlacesProvider(provider) {
+    this.referencePlacesProvider = typeof provider === 'function' ? provider : null;
     this.scheduleDraw();
   }
 
@@ -227,9 +241,79 @@ class WeatherFeatureOverlay {
     context.clearRect(0, 0, width, height);
     if (!this.visible) return;
 
+    this.drawReferencePlaces(context);
+
     for (const feature of this.features) {
       if (this.hiddenLayerIds.has(feature.properties?.layerId)) continue;
       this.drawFeature(context, feature);
+    }
+  }
+
+  drawReferencePlaces(context) {
+    const datasets = this.referencePlacesProvider?.() ?? [];
+    for (const dataset of datasets) {
+      if (!dataset.visible) continue;
+      this.drawReferenceDataset(context, dataset);
+    }
+  }
+
+  drawReferenceDataset(context, dataset) {
+    const clusterLayer = dataset.clusterLayer;
+    const pointLayer = dataset.pointLayer;
+    if (!this.map.getLayer(clusterLayer) || !this.map.getLayer(pointLayer)) return;
+
+    let rendered;
+    try {
+      rendered = this.map.queryRenderedFeatures({
+        layers: [clusterLayer, pointLayer],
+      });
+    } catch {
+      return;
+    }
+
+    const drawn = new Set();
+    for (const feature of rendered) {
+      const coordinates = feature.geometry?.coordinates;
+      if (feature.geometry?.type !== 'Point' || !Array.isArray(coordinates)) continue;
+      const clustered = feature.properties?.cluster === true
+        || feature.properties?.cluster === 'true'
+        || feature.properties?.point_count !== undefined;
+      const key = clustered
+        ? `cluster-${feature.properties?.cluster_id}`
+        : `point-${coordinates[0]}-${coordinates[1]}`;
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+
+      const point = this.map.project(coordinates);
+      const count = Number(feature.properties?.point_count ?? 0);
+      const radius = clustered
+        ? (count >= 750 ? dataset.largeRadius : count >= 100 ? dataset.mediumRadius : dataset.smallRadius)
+        : dataset.pointRadius;
+
+      context.save();
+      context.beginPath();
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fillStyle = colorWithAlpha(dataset.color, clustered ? 0.72 : 0.86);
+      context.fill();
+      context.lineWidth = 2;
+      context.strokeStyle = '#ffffff';
+      context.shadowColor = 'rgba(0,0,0,.48)';
+      context.shadowBlur = 4;
+      context.stroke();
+      context.shadowBlur = 0;
+
+      if (clustered) {
+        context.fillStyle = '#172229';
+        context.font = '700 12px Arial, sans-serif';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(
+          String(feature.properties?.point_count_abbreviated ?? count),
+          point.x,
+          point.y,
+        );
+      }
+      context.restore();
     }
   }
 
@@ -239,20 +323,29 @@ class WeatherFeatureOverlay {
     const selected = String(feature.id) === String(this.selectedFeatureId);
     const properties = feature.properties ?? {};
     const type = geometry.type;
+    const featureColor = selected
+      ? '#ffcf5a'
+      : properties.featureColor ?? properties.stroke ?? properties.color ?? '#1e90ff';
+    const featureOpacity = Math.min(1, Math.max(0.05, Number(properties.featureOpacity ?? 100) / 100));
+    const featureSize = Number(properties.featureSize ?? (type === 'Point' ? 6 : 3));
 
     context.save();
     context.lineJoin = 'round';
     context.lineCap = 'round';
-    context.strokeStyle = selected ? '#ffcf5a' : properties.stroke ?? properties.color ?? '#1e90ff';
-    context.fillStyle = colorWithAlpha(properties.fill ?? properties.fillColor ?? '#1e90ff', selected ? 0.38 : 0.24);
-    context.lineWidth = selected ? 5 : Number(properties.strokeWidth ?? properties.lineWidth ?? 3);
+    context.strokeStyle = colorWithAlpha(featureColor, featureOpacity);
+    context.fillStyle = colorWithAlpha(
+      properties.featureColor ?? properties.fill ?? properties.fillColor ?? '#1e90ff',
+      featureOpacity * (selected ? 0.38 : 0.32),
+    );
+    context.lineWidth = selected ? featureSize + 2 : featureSize;
+    context.setLineDash(dashPattern(properties.featureDash));
     context.shadowColor = 'rgba(0,0,0,.6)';
     context.shadowBlur = 3;
 
     if (type === 'Point') {
-      this.drawPoint(context, geometry.coordinates, properties, selected);
+      this.drawPoint(context, geometry.coordinates, properties, selected, featureSize, featureOpacity);
     } else if (type === 'MultiPoint') {
-      for (const point of geometry.coordinates) this.drawPoint(context, point, properties, selected);
+      for (const point of geometry.coordinates) this.drawPoint(context, point, properties, selected, featureSize, featureOpacity);
     } else if (type === 'LineString') {
       this.drawLine(context, geometry.coordinates);
     } else if (type === 'MultiLineString') {
@@ -266,7 +359,7 @@ class WeatherFeatureOverlay {
     context.restore();
   }
 
-  drawPoint(context, coordinates, properties, selected) {
+  drawPoint(context, coordinates, properties, selected, featureSize, featureOpacity) {
     const point = this.map.project(coordinates);
     if (properties.featureType === 'text') {
       this.drawText(context, point, properties.text || 'Text', properties);
@@ -274,7 +367,8 @@ class WeatherFeatureOverlay {
     }
 
     context.beginPath();
-    context.arc(point.x, point.y, selected ? 8 : 6, 0, Math.PI * 2);
+    context.setLineDash([]);
+    context.arc(point.x, point.y, selected ? featureSize + 2 : featureSize, 0, Math.PI * 2);
     context.fill();
     context.stroke();
     if (properties.labelEnabled) {
@@ -337,6 +431,12 @@ function colorWithAlpha(color, alpha) {
     return `rgba(${red},${green},${blue},${alpha})`;
   }
   return color;
+}
+
+function dashPattern(value) {
+  if (value === 'dashed') return [8, 6];
+  if (value === 'dotted') return [2, 5];
+  return [];
 }
 
 function fontFamily(value) {

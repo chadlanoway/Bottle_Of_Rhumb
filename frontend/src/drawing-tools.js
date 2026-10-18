@@ -19,6 +19,10 @@ const MULTI_SELECT_SOURCE = 'bottle-of-rhumb-multi-selection';
 const MULTI_SELECT_FILL = 'bottle-of-rhumb-multi-selection-fill';
 const MULTI_SELECT_LINE = 'bottle-of-rhumb-multi-selection-line';
 const MULTI_SELECT_POINT = 'bottle-of-rhumb-multi-selection-point';
+const DASHED_LINE_LAYER = 'bottle-of-rhumb-dashed-lines';
+const DOTTED_LINE_LAYER = 'bottle-of-rhumb-dotted-lines';
+const DASHED_POLYGON_LAYER = 'bottle-of-rhumb-dashed-polygons';
+const DOTTED_POLYGON_LAYER = 'bottle-of-rhumb-dotted-polygons';
 const backgroundMarkerStates = new WeakMap();
 const previewPopups = new WeakMap();
 const selectionIntents = new WeakMap();
@@ -34,6 +38,7 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
   const engine = draw.getTerraDrawInstance();
   ensureTextLayers(map);
   ensureMultiSelectionLayers(map);
+  ensureFeatureAppearance(map);
   keepPointLayersAbovePolygons(map);
   const pressedSelectionKeys = new Set();
   const selectionKeys = new Set(['Shift', 'Control', 'Meta']);
@@ -209,8 +214,22 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
   ];
   const filter = ['!', hidden];
 
-  for (const layerId of ['td-linestring', 'td-polygon', 'td-polygon-outline']) {
-    if (map.getLayer(layerId)) map.setFilter(layerId, filter);
+  if (map.getLayer('td-linestring')) {
+    map.setFilter('td-linestring', ['all', filter, solidFeatureFilter()]);
+  }
+  if (map.getLayer('td-polygon')) map.setFilter('td-polygon', filter);
+  if (map.getLayer('td-polygon-outline')) {
+    map.setFilter('td-polygon-outline', ['all', filter, solidFeatureFilter()]);
+  }
+  for (const [layerId, geometryType, dash] of [
+    [DASHED_LINE_LAYER, 'LineString', 'dashed'],
+    [DOTTED_LINE_LAYER, 'LineString', 'dotted'],
+    [DASHED_POLYGON_LAYER, 'Polygon', 'dashed'],
+    [DOTTED_POLYGON_LAYER, 'Polygon', 'dotted'],
+  ]) {
+    if (map.getLayer(layerId)) {
+      map.setFilter(layerId, ['all', filter, ['==', ['geometry-type'], geometryType], ['==', ['get', 'featureDash'], dash]]);
+    }
   }
 
   const pointFilter = ['all', filter, [
@@ -309,6 +328,73 @@ export function addDerivedGeoJSON(draw, collection, layerId) {
     collection: getFeatureCollection(draw),
     addedIds: validations.map((validation) => validation.id).filter((id) => id !== undefined),
   };
+}
+
+function ensureFeatureAppearance(map) {
+  const color = [
+    'case',
+    ['==', ['get', 'selected'], true],
+    '#ffd166',
+    ['coalesce', ['get', 'featureColor'], '#1e90ff'],
+  ];
+  const opacity = ['/', ['coalesce', ['get', 'featureOpacity'], 100], 100];
+  const lineWidth = [
+    '+',
+    ['coalesce', ['get', 'featureSize'], 3],
+    ['case', ['==', ['get', 'selected'], true], 2, 0],
+  ];
+
+  setPaint(map, 'td-linestring', 'line-color', color);
+  setPaint(map, 'td-linestring', 'line-width', lineWidth);
+  setPaint(map, 'td-linestring', 'line-opacity', opacity);
+  setPaint(map, 'td-polygon-outline', 'line-color', color);
+  setPaint(map, 'td-polygon-outline', 'line-width', lineWidth);
+  setPaint(map, 'td-polygon-outline', 'line-opacity', opacity);
+  setPaint(map, 'td-polygon', 'fill-color', color);
+  setPaint(map, 'td-polygon', 'fill-opacity', ['*', opacity, 0.32]);
+  setPaint(map, 'td-point', 'circle-color', color);
+  setPaint(map, 'td-point', 'circle-radius', [
+    '+',
+    ['coalesce', ['get', 'featureSize'], 6],
+    ['case', ['==', ['get', 'selected'], true], 2, 0],
+  ]);
+  setPaint(map, 'td-point', 'circle-opacity', opacity);
+  setPaint(map, 'td-point', 'circle-stroke-color', '#ffffff');
+  setPaint(map, 'td-point', 'circle-stroke-width', 2);
+  setPaint(map, 'td-point', 'circle-stroke-opacity', opacity);
+
+  const source = map.getStyle().layers.find((layer) => layer.id === 'td-linestring')?.source;
+  if (!source) return;
+  const beforeId = map.getLayer(FEATURE_LABEL_LAYER) ? FEATURE_LABEL_LAYER : undefined;
+  addDashLayer(map, DASHED_LINE_LAYER, source, 'LineString', 'dashed', [2, 2], color, opacity, lineWidth, beforeId);
+  addDashLayer(map, DOTTED_LINE_LAYER, source, 'LineString', 'dotted', [0.25, 1.8], color, opacity, lineWidth, beforeId);
+  addDashLayer(map, DASHED_POLYGON_LAYER, source, 'Polygon', 'dashed', [2, 2], color, opacity, lineWidth, beforeId);
+  addDashLayer(map, DOTTED_POLYGON_LAYER, source, 'Polygon', 'dotted', [0.25, 1.8], color, opacity, lineWidth, beforeId);
+}
+
+function addDashLayer(map, id, source, geometryType, dash, dashArray, color, opacity, width, beforeId) {
+  if (map.getLayer(id)) return;
+  map.addLayer({
+    id,
+    type: 'line',
+    source,
+    filter: ['all', ['==', ['geometry-type'], geometryType], ['==', ['get', 'featureDash'], dash]],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': color,
+      'line-width': width,
+      'line-opacity': opacity,
+      'line-dasharray': dashArray,
+    },
+  }, beforeId);
+}
+
+function solidFeatureFilter() {
+  return ['!', ['in', ['coalesce', ['get', 'featureDash'], 'solid'], ['literal', ['dashed', 'dotted']]]];
+}
+
+function setPaint(map, layerId, property, value) {
+  if (map.getLayer(layerId)) map.setPaintProperty(layerId, property, value);
 }
 
 function keepPointLayersAbovePolygons(map) {

@@ -10,6 +10,10 @@ const RESERVED_PROPERTIES = new Set([
   'committedCoordinateCount',
   'provisionalCoordinateCount',
   'featureType',
+  'featureColor',
+  'featureOpacity',
+  'featureSize',
+  'featureDash',
   'labelEnabled',
   'labelText',
   'text',
@@ -153,6 +157,9 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
               placeholder="What should viewers know about this feature?"
               onChange={(event) => onUpdate({ description: event.target.value })}
             />
+            {!isTextFeature && (
+              <AppearanceControls feature={feature} onUpdate={onUpdate} />
+            )}
           </>
         )}
 
@@ -213,6 +220,92 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
         </button>
       </footer>
     </section>
+  );
+}
+
+function AppearanceControls({ feature, onUpdate }) {
+  const properties = feature.properties ?? {};
+  const geometryType = feature.geometry?.type;
+  const isPoint = geometryType === 'Point' || geometryType === 'MultiPoint';
+  const supportsDash = geometryType === 'LineString'
+    || geometryType === 'MultiLineString'
+    || geometryType === 'Polygon'
+    || geometryType === 'MultiPolygon';
+  const size = Number(properties.featureSize ?? (isPoint ? 6 : 3));
+  const opacity = Number(properties.featureOpacity ?? 100);
+
+  return (
+    <fieldset className="feature-appearance-fieldset">
+      <legend>Appearance</legend>
+      <div className="feature-appearance-grid">
+        <label>
+          <span className="field-label">Color</span>
+          <input
+            className="feature-color-input"
+            type="color"
+            value={properties.featureColor ?? '#1e90ff'}
+            onChange={(event) => onUpdate({ featureColor: event.target.value })}
+          />
+        </label>
+
+        {supportsDash && (
+          <label>
+            <span className="field-label">Line style</span>
+            <select
+              value={properties.featureDash ?? 'solid'}
+              onChange={(event) => onUpdate({ featureDash: event.target.value })}
+            >
+              <option value="solid">Solid</option>
+              <option value="dashed">Dashed</option>
+              <option value="dotted">Dotted</option>
+            </select>
+          </label>
+        )}
+      </div>
+
+      <label className="feature-appearance-range">
+        <span>{isPoint ? 'Point size' : 'Line width'}</span>
+        <div>
+          <input
+            type="range"
+            min={isPoint ? 3 : 1}
+            max={isPoint ? 20 : 12}
+            step="1"
+            value={size}
+            onChange={(event) => onUpdate({ featureSize: Number(event.target.value) })}
+          />
+          <output>{size}px</output>
+        </div>
+      </label>
+
+      <label className="feature-appearance-range">
+        <span>Opacity</span>
+        <div>
+          <input
+            type="range"
+            min="5"
+            max="100"
+            step="1"
+            value={opacity}
+            onChange={(event) => onUpdate({ featureOpacity: Number(event.target.value) })}
+          />
+          <output>{opacity}%</output>
+        </div>
+      </label>
+
+      <button
+        className="reset-feature-appearance"
+        type="button"
+        onClick={() => onUpdate({
+          featureColor: undefined,
+          featureOpacity: undefined,
+          featureSize: undefined,
+          featureDash: undefined,
+        })}
+      >
+        Reset appearance
+      </button>
+    </fieldset>
   );
 }
 

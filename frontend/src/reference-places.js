@@ -38,6 +38,7 @@ export class ReferencePlacesControl {
     }
 
     weatherControl.buttons.get('ports')?.classList.add('rhumb-control-reference-start');
+    weatherControl.setReferencePlacesProvider(() => this.getOverlayDatasets());
     map.once('remove', () => this.destroy());
   }
 
@@ -59,6 +60,7 @@ export class ReferencePlacesControl {
       active: showing,
       title: `${showing ? 'Hide' : 'Show'} ${config.label.toLowerCase()}`,
     });
+    this.weatherControl.redrawFeatureOverlay();
   }
 
   async load(kind) {
@@ -133,6 +135,21 @@ export class ReferencePlacesControl {
     this.listen('mouseleave', clusterId, () => { this.map.getCanvas().style.cursor = ''; });
     this.listen('mouseenter', pointId, () => { this.map.getCanvas().style.cursor = 'pointer'; });
     this.listen('mouseleave', pointId, () => { this.map.getCanvas().style.cursor = ''; });
+    this.weatherControl.redrawFeatureOverlay();
+    this.map.once('idle', () => this.weatherControl.redrawFeatureOverlay());
+  }
+
+  getOverlayDatasets() {
+    return Object.entries(DATASETS).map(([kind, config]) => ({
+      visible: this.visible.has(kind),
+      clusterLayer: `${config.sourceId}-clusters`,
+      pointLayer: `${config.sourceId}-points`,
+      color: config.color,
+      smallRadius: kind === 'ports' ? 14 : 14,
+      mediumRadius: kind === 'ports' ? 20 : 20,
+      largeRadius: 25,
+      pointRadius: 6,
+    }));
   }
 
   showPlace(kind, feature) {
@@ -195,6 +212,7 @@ export class ReferencePlacesControl {
 
   destroy() {
     this.popup?.remove();
+    this.weatherControl.setReferencePlacesProvider(null);
     for (const [event, layerId, handler] of this.handlers) {
       try { this.map.off(event, layerId, handler); } catch { /* map is being removed */ }
     }
