@@ -43,7 +43,14 @@ export function createMap(container, basemapId = 'positron', options = {}) {
     attributionControl: true,
   });
 
-  const weatherControl = new RhumbMapControl();
+  const projection = options.projection === 'globe' ? 'globe' : 'mercator';
+  if (projection === 'globe') {
+    map.once('style.load', () => {
+      map.setProjection({ type: 'globe' });
+    });
+  }
+
+  const weatherControl = new RhumbMapControl(projection);
   map.addControl(weatherControl, 'top-right');
   map.rhumbWeatherControl = weatherControl;
   map.rhumbReferencePlaces = new ReferencePlacesControl(

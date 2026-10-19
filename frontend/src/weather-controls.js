@@ -5,7 +5,7 @@ const WEATHER_GEOJSON_URL = trimSlash(
 );
 
 export class RhumbMapControl {
-  constructor() {
+  constructor(preferredProjection = 'mercator') {
     this.map = null;
     this.container = null;
     this.weather = null;
@@ -13,6 +13,7 @@ export class RhumbMapControl {
     this.mode = null;
     this.buttons = new Map();
     this.featureOverlay = null;
+    this.preferredProjection = preferredProjection === 'globe' ? 'globe' : 'mercator';
   }
 
   onAdd(map) {
@@ -64,14 +65,17 @@ export class RhumbMapControl {
     this.setBusy(true);
 
     try {
+      if (mode) this.applyProjection('mercator');
       const weather = await this.getWeather();
       await weather.setMode(mode);
       this.mode = mode;
+      if (!mode) this.restorePreferredProjection();
       this.featureOverlay?.setVisible(Boolean(mode));
       this.featureOverlay?.bringToFront();
       this.updateWeatherButtons();
     } catch (error) {
       console.error('Weather overlay failed:', error);
+      if (!this.mode) this.restorePreferredProjection();
       this.setWeatherUnavailable(error.message || 'Weather failed to load');
     } finally {
       this.setBusy(false);
@@ -112,8 +116,37 @@ export class RhumbMapControl {
     if (!this.mode || !this.weather) return;
     await this.weather.setMode(null);
     this.mode = null;
+    this.restorePreferredProjection();
     this.featureOverlay?.setVisible(false);
     this.updateWeatherButtons();
+  }
+
+  setPreferredProjection(projection) {
+    this.preferredProjection = projection === 'globe' ? 'globe' : 'mercator';
+    this.applyProjection(this.mode ? 'mercator' : this.preferredProjection);
+  }
+
+  restorePreferredProjection() {
+    const restore = () => {
+      if (!this.mode) this.applyProjection(this.preferredProjection);
+    };
+
+    restore();
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+    setTimeout(restore, 150);
+    this.map?.once?.('idle', restore);
+  }
+
+  applyProjection(projection) {
+    if (!this.map) return;
+    if (!this.map.isStyleLoaded?.()) {
+      this.map.once?.('styledata', () => {
+        if (!this.mode) this.applyProjection(this.preferredProjection);
+      });
+      return;
+    }
+    const current = this.map.getProjection?.()?.type ?? 'mercator';
+    if (current !== projection) this.map.setProjection({ type: projection });
   }
 
   updateWeatherButtons() {

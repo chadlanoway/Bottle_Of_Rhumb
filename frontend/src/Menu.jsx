@@ -232,6 +232,7 @@ export default function Menu({
   activeLayerId,
   basemapId,
   basemaps,
+  projection,
   disabled,
   features,
   layers,
@@ -243,6 +244,7 @@ export default function Menu({
   onAddLayer,
   onApplyGeoJSON,
   onBasemapChange,
+  onProjectionChange,
   onClearView,
   onDeleteLayer,
   onExport,
@@ -328,12 +330,14 @@ export default function Menu({
             <MapSection
               basemapId={basemapId}
               basemaps={basemaps}
+              projection={projection}
               disabled={disabled}
               layers={layers}
               legend={legend}
               savedView={savedView}
               viewMessage={viewMessage}
               onBasemapChange={onBasemapChange}
+              onProjectionChange={onProjectionChange}
               onClearView={onClearView}
               onFitToFeatures={onFitToFeatures}
               onLegendChange={onLegendChange}
@@ -456,12 +460,14 @@ function formatCollection(features) {
 function MapSection({
   basemapId,
   basemaps,
+  projection,
   disabled,
   layers,
   legend,
   savedView,
   viewMessage,
   onBasemapChange,
+  onProjectionChange,
   onClearView,
   onFitToFeatures,
   onLegendChange,
@@ -538,6 +544,21 @@ function MapSection({
           </button>
         ))}
       </div>
+
+      <label className="field-label" htmlFor="projection-select">Projection</label>
+      <select
+        id="projection-select"
+        className="basemap-select"
+        disabled={disabled}
+        value={projection}
+        onChange={(event) => onProjectionChange(event.target.value)}
+      >
+        <option value="mercator">Mercator</option>
+        <option value="globe">Globe</option>
+      </select>
+      <p className="basemap-description">
+        Weather temporarily uses Mercator and restores your selected projection when turned off.
+      </p>
 
       <div className="map-settings-divider" />
       <div className="section-heading-row">

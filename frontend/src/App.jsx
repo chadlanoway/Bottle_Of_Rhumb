@@ -69,6 +69,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [basemapId, setBasemapId] = useState('positron');
+  const [projection, setProjection] = useState('mercator');
   const [routingActive, setRoutingActive] = useState(false);
   const [routingStatus, setRoutingStatus] = useState('');
   const [legend, setLegend] = useState({
@@ -137,6 +138,7 @@ export default function App() {
   function mountMap(nextBasemapId, restoredFeatures, restoredLayers, restoredSelection) {
     const map = createMap(mapContainerRef.current, nextBasemapId, {
       onAddReferencePoint: handleAddReferencePoint,
+      projection,
     });
     mapRef.current = map;
 
@@ -634,6 +636,12 @@ export default function App() {
     setBasemapId(nextId);
   }
 
+  function handleProjectionChange(nextProjection) {
+    const normalized = nextProjection === 'globe' ? 'globe' : 'mercator';
+    setProjection(normalized);
+    mapRef.current?.rhumbWeatherControl?.setPreferredProjection(normalized);
+  }
+
   function handleLegendChange(changes) {
     setLegend((current) => ({ ...current, ...changes }));
   }
@@ -697,6 +705,7 @@ export default function App() {
         activeLayerId={activeLayerId}
         basemapId={basemapId}
         basemaps={BASEMAPS}
+        projection={projection}
         disabled={!mapReady}
         features={features}
         layers={layers}
@@ -707,6 +716,7 @@ export default function App() {
         viewMessage={viewMessage}
         onAddLayer={handleAddLayer}
         onBasemapChange={handleBasemapChange}
+        onProjectionChange={handleProjectionChange}
         onExport={() => exportGeoJSON(drawRef.current)}
         onImport={handleImport}
         onApplyGeoJSON={handleApplyGeoJSON}
