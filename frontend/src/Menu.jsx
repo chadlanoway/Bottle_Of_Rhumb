@@ -424,14 +424,14 @@ function DataSection({
         ref={fileInputRef}
         className="visually-hidden"
         type="file"
-        accept=".geojson,.json,application/geo+json,application/json"
+        accept=".geojson,.json,.kml,.gpx,application/geo+json,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml"
         onChange={onFileChange}
       />
       <div className="button-row">
         <button className="secondary-button" disabled={disabled} type="button" onClick={() => fileInputRef.current?.click()}>Import layer</button>
         <button className="secondary-button" disabled={disabled || features.length === 0} type="button" onClick={onExport}>Export</button>
       </div>
-      <p className="data-drop-help">You can also drop a GeoJSON file directly onto the map.</p>
+      <p className="data-drop-help">You can also drop a GeoJSON, KML, or GPX file directly onto the map.</p>
 
       <div className="map-settings-divider" />
       <p className="section-label">GeoJSON editor</p>

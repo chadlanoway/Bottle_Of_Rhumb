@@ -33,6 +33,11 @@ import {
   showSearchResult,
 } from './routing-tools.js';
 import { uploadPopupImage } from './image-upload.js';
+import {
+  isSupportedSpatialFile,
+  readSpatialFile,
+  spatialFileLayerName,
+} from './file-import.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -389,7 +394,7 @@ export default function App() {
   async function handleImport(file) {
     try {
       setError('');
-      const collection = JSON.parse(await file.text());
+      const collection = await readSpatialFile(file);
       const layerId = `layer-${crypto.randomUUID()}`;
       const loaded = addGeoJSON(
         drawRef.current,
@@ -397,7 +402,7 @@ export default function App() {
         collection,
         layerId,
       );
-      const name = file.name.replace(/\.(geojson|json)$/i, '') || 'Imported layer';
+      const name = spatialFileLayerName(file.name);
       setLayers((current) => [...current, makeLayer(layerId, name, current.length)]);
       setActiveLayerId(layerId);
       setSelectedFeatureIds([]);
@@ -468,9 +473,9 @@ export default function App() {
     event.preventDefault();
     dragDepthRef.current = 0;
     setDragActive(false);
-    const file = Array.from(event.dataTransfer.files).find(isGeoJSONFile);
+    const file = Array.from(event.dataTransfer.files).find(isSupportedSpatialFile);
     if (!file) {
-      setError('Drop a .geojson or .json file to import it as a new layer.');
+      setError('Drop a .geojson, .json, .kml, or .gpx file to import it as a new layer.');
       return;
     }
     await handleImport(file);
@@ -746,7 +751,7 @@ export default function App() {
       {dragActive && (
         <div className="geojson-drop-overlay" aria-hidden="true">
           <div>
-            <strong>Drop GeoJSON to add a layer</strong>
+            <strong>Drop GeoJSON, KML, or GPX to add a layer</strong>
             <span>The existing map will be preserved.</span>
           </div>
         </div>
@@ -846,6 +851,3 @@ function hasFileTransfer(event) {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files');
 }
 
-function isGeoJSONFile(file) {
-  return /\.(geojson|json)$/i.test(file.name);
-}
