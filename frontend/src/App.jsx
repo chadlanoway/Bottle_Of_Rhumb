@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Menu, { AppHeader, EditorToolbar } from './Menu.jsx';
 import FeatureEditor from './FeatureEditor.jsx';
+import Tutorial from './Tutorial.jsx';
 import {
   BASEMAPS,
   createMap,
@@ -55,6 +56,8 @@ function makeLayer(id, name, index = 0) {
 const DEFAULT_LAYER = makeLayer('default-layer', 'Untitled layer');
 const LAND_ROUTING_API_URL = import.meta.env.VITE_LAND_ROUTING_API_URL ?? '';
 const IMAGE_UPLOAD_API_URL = import.meta.env.VITE_IMAGE_UPLOAD_API_URL ?? '';
+const TUTORIAL_LAYER_ID = 'bottle-of-rhumb-tutorial';
+const TUTORIAL_CENTER = [-87.72, 42.47];
 
 export default function App() {
   const mapContainerRef = useRef(null);
@@ -64,6 +67,7 @@ export default function App() {
   const dragDepthRef = useRef(0);
   const routingControllerRef = useRef(null);
   const searchMarkerRef = useRef(null);
+  const tutorialFeatureIdsRef = useRef({ points: [], route: [] });
   const [mapReady, setMapReady] = useState(false);
   const [features, setFeatures] = useState([]);
   const [layers, setLayers] = useState([DEFAULT_LAYER]);
@@ -74,9 +78,10 @@ export default function App() {
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [basemapId, setBasemapId] = useState('positron');
-  const [projection, setProjection] = useState('mercator');
+  const [projection, setProjection] = useState('globe');
   const [routingActive, setRoutingActive] = useState(false);
   const [routingStatus, setRoutingStatus] = useState('');
+  const [tutorialStep, setTutorialStep] = useState(null);
   const [legend, setLegend] = useState({
     visible: true,
     title: 'Legend',
@@ -669,6 +674,155 @@ export default function App() {
     }));
   }
 
+  function ensureTutorialLayer() {
+    activeLayerIdRef.current = TUTORIAL_LAYER_ID;
+    setActiveLayerId(TUTORIAL_LAYER_ID);
+    setLayers((current) => (
+      current.some((layer) => layer.id === TUTORIAL_LAYER_ID)
+        ? current
+        : [...current, makeLayer(TUTORIAL_LAYER_ID, 'Tutorial route', current.length)]
+    ));
+  }
+
+  function ensureTutorialPoints() {
+    const existing = tutorialFeatureIdsRef.current.points.filter((id) => (
+      features.some((feature) => String(feature.id) === String(id))
+    ));
+    if (existing.length === 2) return existing;
+
+    ensureTutorialLayer();
+    const collection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [-87.605, 41.888] },
+          properties: {
+            name: 'Chicago Harbor',
+            description: 'Sample starting point on Lake Michigan.',
+            labelEnabled: true,
+            labelText: 'Chicago',
+            popupEnabled: true,
+            popupTitle: 'Chicago Harbor',
+            popupDescription: 'The starting point for the tutorial route.',
+          },
+        },
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [-87.893, 43.035] },
+          properties: {
+            name: 'Milwaukee Harbor',
+            description: 'Sample ending point on Lake Michigan.',
+            labelEnabled: true,
+            labelText: 'Milwaukee',
+            popupEnabled: true,
+            popupTitle: 'Milwaukee Harbor',
+            popupDescription: 'The ending point for the tutorial route.',
+          },
+        },
+      ],
+    };
+    const added = addDerivedGeoJSON(drawRef.current, collection, TUTORIAL_LAYER_ID);
+    tutorialFeatureIdsRef.current.points = added.addedIds;
+    setFeatures(added.collection.features);
+    return added.addedIds;
+  }
+
+  function ensureTutorialRoute() {
+    const existing = tutorialFeatureIdsRef.current.route.filter((id) => (
+      features.some((feature) => String(feature.id) === String(id))
+    ));
+    if (existing.length > 0) return existing;
+
+    ensureTutorialPoints();
+    const collection = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [-87.605, 41.888],
+            [-87.548, 42.18],
+            [-87.61, 42.52],
+            [-87.74, 42.78],
+            [-87.893, 43.035],
+          ],
+        },
+        properties: {
+          name: 'Lake Michigan sample route',
+          description: 'A demonstration route between Chicago and Milwaukee.',
+          featureColor: '#e6643c',
+          featureSize: 4,
+          popupEnabled: true,
+          popupTitle: 'Lake Michigan route',
+          popupDescription: 'This route can also be imported from GPX, KML, or GeoJSON.',
+        },
+      }],
+    };
+    const added = addDerivedGeoJSON(drawRef.current, collection, TUTORIAL_LAYER_ID);
+    tutorialFeatureIdsRef.current.route = added.addedIds;
+    setFeatures(added.collection.features);
+    return added.addedIds;
+  }
+
+  function showTutorialStep(step) {
+    if (!mapReady) return;
+    setTutorialStep(step);
+
+    if (step <= 1) {
+      mapRef.current?.easeTo({ center: TUTORIAL_CENTER, zoom: 7.1, bearing: 0, pitch: 0, duration: 1200 });
+    }
+    if (step === 2) ensureTutorialPoints();
+    if (step === 3) {
+      const [startId] = ensureTutorialPoints();
+      if (startId !== undefined) {
+        selectFeature(drawRef.current, startId);
+        setSelectedFeatureIds([startId]);
+      }
+    }
+    if (step === 4) ensureTutorialRoute();
+  }
+
+  function closeTutorial() {
+    setTutorialStep(null);
+
+    const tutorialIds = new Set([
+      ...tutorialFeatureIdsRef.current.points,
+      ...tutorialFeatureIdsRef.current.route,
+    ].map(String));
+    const tutorialLayerExists = layers.some((layer) => layer.id === TUTORIAL_LAYER_ID);
+
+    if (tutorialLayerExists && drawRef.current) {
+      deleteLayerFeatures(drawRef.current, TUTORIAL_LAYER_ID);
+    }
+
+    tutorialFeatureIdsRef.current = { points: [], route: [] };
+    setFeatures((current) => current.filter(
+      (feature) => feature.properties?.layerId !== TUTORIAL_LAYER_ID,
+    ));
+    setSelectedFeatureIds((current) => current.filter(
+      (id) => !tutorialIds.has(String(id)),
+    ));
+
+    if (tutorialLayerExists) {
+      const remainingLayers = layers.filter((layer) => layer.id !== TUTORIAL_LAYER_ID);
+      const nextLayers = remainingLayers.length > 0 ? remainingLayers : [DEFAULT_LAYER];
+      const nextActiveId = activeLayerId === TUTORIAL_LAYER_ID
+        ? nextLayers[0].id
+        : activeLayerId;
+
+      activeLayerIdRef.current = nextActiveId;
+      setLayers(nextLayers);
+      setActiveLayerId(nextActiveId);
+      setHiddenLayers(
+        drawRef.current,
+        mapRef.current,
+        nextLayers.filter((layer) => !layer.visible).map((layer) => layer.id),
+      );
+    }
+  }
+
   const activeLayer = layers.find((layer) => layer.id === activeLayerId);
   const selectedFeature = features.find(
     (feature) => String(feature.id) === String(selectedFeatureId),
@@ -687,7 +841,10 @@ export default function App() {
     >
       <div ref={mapContainerRef} className="map-canvas" />
       <MapLegend legend={legend} layers={layers} features={features} />
-      <AppHeader />
+      <AppHeader
+        onStartTutorial={() => showTutorialStep(0)}
+        tutorialActive={tutorialStep !== null}
+      />
       <EditorToolbar
         activeLayer={activeLayer}
         disabled={!mapReady}
@@ -705,6 +862,7 @@ export default function App() {
         routingActive={routingActive}
         routingStatus={routingStatus}
         viewSaved={Boolean(savedView)}
+        tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
       />
       <Menu
         activeLayerId={activeLayerId}
@@ -736,6 +894,10 @@ export default function App() {
         onPreviewView={handlePreviewView}
         onSaveView={handleSaveView}
         onToggleLayer={handleToggleLayer}
+        tutorialExpanded={tutorialStep !== null ? true : undefined}
+        tutorialSection={tutorialStep === null
+          ? undefined
+          : ['map', 'map', 'layers', 'layers', 'data', 'share'][tutorialStep]}
       />
       <FeatureEditor
         feature={selectedFeature}
@@ -746,6 +908,13 @@ export default function App() {
         onImageUpload={handlePopupImageUpload}
         onPreview={() => previewFeaturePopup(drawRef.current, mapRef.current, selectedFeatureId, legend)}
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
+        tutorialExpanded={tutorialStep === 3 ? false : undefined}
+      />
+      <Tutorial
+        step={tutorialStep}
+        onBack={() => showTutorialStep(Math.max(0, tutorialStep - 1))}
+        onClose={closeTutorial}
+        onNext={() => showTutorialStep(Math.min(5, tutorialStep + 1))}
       />
 
       {dragActive && (

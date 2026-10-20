@@ -47,7 +47,7 @@ const FONT_OPTIONS = [
   { value: 'mono', label: 'Monospace' },
 ];
 
-export default function FeatureEditor({ feature, features = [], legend, onDelete, onGeometryOperation, onImageUpload, onPreview, onUpdate }) {
+export default function FeatureEditor({ feature, features = [], legend, onDelete, onGeometryOperation, onImageUpload, onPreview, onUpdate, tutorialExpanded, tutorialTab }) {
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [rows, setRows] = useState([]);
@@ -72,6 +72,11 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
       savedKey: key,
     })));
   }, [feature?.id, feature?.properties?.featureType, multiple, selectionCount]);
+
+  useEffect(() => {
+    if (tutorialExpanded !== undefined) setCollapsed(!tutorialExpanded);
+    if (tutorialTab) setActiveTab(tutorialTab);
+  }, [tutorialExpanded, tutorialTab]);
 
   if (!feature) return null;
 

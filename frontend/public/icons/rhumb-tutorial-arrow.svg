@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="112" viewBox="0 0 72 112" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">Bottle of Rhumb tutorial arrow</title>
+  <desc id="description">A teal blue downward arrow with a dark outline and soft glow.</desc>
+  <defs>
+    <linearGradient id="arrow-fill" x1="18" y1="12" x2="57" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69DCEB"/>
+      <stop offset="1" stop-color="#258EAA"/>
+    </linearGradient>
+    <filter id="arrow-glow" x="-70%" y="-45%" width="240%" height="210%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#031016" flood-opacity="0.72"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#42C6DE" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <g filter="url(#arrow-glow)">
+    <path
+      d="M27 12C27 8.686 29.686 6 33 6H39C42.314 6 45 8.686 45 12V62H59.34C64.747 62 67.425 68.563 63.564 72.35L40.224 95.242C37.888 97.533 34.112 97.533 31.776 95.242L8.436 72.35C4.575 68.563 7.253 62 12.66 62H27V12Z"
+      fill="url(#arrow-fill)"
+      stroke="#06171E"
+      stroke-width="6"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M34 15V66H17.5L36 84.2"
+      stroke="#C9F8FF"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.58"
+    />
+  </g>
+</svg>

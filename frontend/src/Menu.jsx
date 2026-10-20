@@ -20,7 +20,7 @@ const ROUTE_PROFILES = [
 
 const geometryIcon = { Point: '●', LineString: '╱', Polygon: '⬡' };
 
-export function AppHeader() {
+export function AppHeader({ onStartTutorial, tutorialActive = false }) {
   return (
     <header className="app-header">
       <div className="app-title">
@@ -41,14 +41,56 @@ export function AppHeader() {
         </a>
 
         <button
-          className="donate-button"
+          className={`header-tutorial-button ${tutorialActive ? 'is-active' : ''}`}
           type="button"
-          disabled
-          title="Coming later"
+          title="Show the guided map-making demo"
+          aria-label="Start guided tutorial"
+          aria-pressed={tutorialActive}
+          onClick={onStartTutorial}
         >
-          Reserved
+          ?
         </button>
       </nav>
+
+      <style>{`
+        .header-tutorial-button {
+          display: grid;
+          width: 32px;
+          height: 32px;
+          padding: 0;
+          place-items: center;
+          border: 1px solid #617d98;
+          border-radius: 50%;
+          background: #172f49;
+          color: #f4f8fb;
+          font: inherit;
+          font-size: 17px;
+          font-weight: 800;
+          cursor: pointer;
+          animation: rhumb-help-pulse 3s ease-in-out infinite;
+        }
+
+        .header-tutorial-button:hover,
+        .header-tutorial-button:focus-visible,
+        .header-tutorial-button.is-active {
+          background: #214766;
+          border-color: #9bb9d3;
+        }
+
+        .header-tutorial-button:focus-visible {
+          outline: 2px solid #d6e8f7;
+          outline-offset: 3px;
+        }
+
+        @keyframes rhumb-help-pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(25, 62, 96, 0.25); }
+          50% { box-shadow: 0 0 0 9px rgba(25, 62, 96, 0.7); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .header-tutorial-button { animation: none; }
+        }
+      `}</style>
     </header>
   );
 }
@@ -70,6 +112,7 @@ export function EditorToolbar({
   routingActive,
   routingStatus,
   viewSaved,
+  tutorialDrawMenuOpen = false,
 }) {
   const [drawMenuOpen, setDrawMenuOpen] = useState(false);
   const [routeProfile, setRouteProfile] = useState('foot-walking');
@@ -87,6 +130,10 @@ export function EditorToolbar({
     document.addEventListener('pointerdown', closeDrawMenu);
     return () => document.removeEventListener('pointerdown', closeDrawMenu);
   }, []);
+
+  useEffect(() => {
+    setDrawMenuOpen(tutorialDrawMenuOpen);
+  }, [tutorialDrawMenuOpen]);
 
   function chooseTool(type) {
     setDrawMenuOpen(false);
@@ -258,10 +305,17 @@ export default function Menu({
   onSaveView,
   onSelectFeature,
   onToggleLayer,
+  tutorialExpanded,
+  tutorialSection,
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState('layers');
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (tutorialExpanded !== undefined) setCollapsed(!tutorialExpanded);
+    if (tutorialSection) setActiveSection(tutorialSection);
+  }, [tutorialExpanded, tutorialSection]);
 
   async function handleFileChange(event) {
     const [file] = event.target.files;
@@ -273,15 +327,17 @@ export default function Menu({
     <aside className={`app-menu ${collapsed ? 'app-menu--collapsed' : ''}`}>
       <div className="panel-heading">
         <strong>{collapsed ? '' : 'Map editor'}</strong>
-        <button
-          className="icon-button"
-          type="button"
-          title={collapsed ? 'Open panel' : 'Collapse panel'}
-          aria-label={collapsed ? 'Open panel' : 'Collapse panel'}
-          onClick={() => setCollapsed((value) => !value)}
-        >
-          {collapsed ? '›' : '‹'}
-        </button>
+        <div className="panel-heading-actions">
+          <button
+            className="icon-button"
+            type="button"
+            title={collapsed ? 'Open panel' : 'Collapse panel'}
+            aria-label={collapsed ? 'Open panel' : 'Collapse panel'}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? '›' : '‹'}
+          </button>
+        </div>
       </div>
 
       {!collapsed && (
