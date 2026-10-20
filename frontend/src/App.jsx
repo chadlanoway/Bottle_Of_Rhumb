@@ -57,7 +57,7 @@ const DEFAULT_LAYER = makeLayer('default-layer', 'Untitled layer');
 const LAND_ROUTING_API_URL = import.meta.env.VITE_LAND_ROUTING_API_URL ?? '';
 const IMAGE_UPLOAD_API_URL = import.meta.env.VITE_IMAGE_UPLOAD_API_URL ?? '';
 const TUTORIAL_LAYER_ID = 'bottle-of-rhumb-tutorial';
-const TUTORIAL_CENTER = [-87.72, 42.47];
+const TUTORIAL_CENTER = [-87.72, 43.27];
 
 export default function App() {
   const mapContainerRef = useRef(null);
@@ -495,6 +495,21 @@ export default function App() {
     setActiveLayerId(id);
   }
 
+  function handleReorderLayer(sourceId, targetId) {
+    if (sourceId === targetId) return;
+
+    setLayers((current) => {
+      const sourceIndex = current.findIndex((layer) => layer.id === sourceId);
+      const targetIndex = current.findIndex((layer) => layer.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+
+      const next = [...current];
+      const [movedLayer] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, movedLayer);
+      return next;
+    });
+  }
+
   function handleSelectFeature(id, options = {}) {
     mapRef.current?.rhumbWeatherControl?.disableWeather();
 
@@ -771,7 +786,7 @@ export default function App() {
     setTutorialStep(step);
 
     if (step <= 1) {
-      mapRef.current?.easeTo({ center: TUTORIAL_CENTER, zoom: 7.1, bearing: 0, pitch: 0, duration: 1200 });
+      mapRef.current?.easeTo({ center: TUTORIAL_CENTER, zoom: 6.1, bearing: 0, pitch: 0, duration: 1200 });
     }
     if (step === 2) ensureTutorialPoints();
     if (step === 3) {
@@ -892,6 +907,7 @@ export default function App() {
         onSelectFeature={handleSelectFeature}
         onFitToFeatures={handleFitToFeatures}
         onPreviewView={handlePreviewView}
+        onReorderLayer={handleReorderLayer}
         onSaveView={handleSaveView}
         onToggleLayer={handleToggleLayer}
         tutorialExpanded={tutorialStep !== null ? true : undefined}

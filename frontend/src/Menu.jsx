@@ -302,6 +302,7 @@ export default function Menu({
   onLegendLayerChange,
   onRenameLayer,
   onPreviewView,
+  onReorderLayer,
   onSaveView,
   onSelectFeature,
   onToggleLayer,
@@ -365,6 +366,7 @@ export default function Menu({
               onAddLayer={onAddLayer}
               onDeleteLayer={onDeleteLayer}
               onLayerChange={onLayerChange}
+              onReorderLayer={onReorderLayer}
               onRenameLayer={onRenameLayer}
               onSelectFeature={onSelectFeature}
               onToggleLayer={onToggleLayer}
@@ -778,11 +780,43 @@ function LayersSection({
   onAddLayer,
   onDeleteLayer,
   onLayerChange,
+  onReorderLayer,
   onRenameLayer,
   onSelectFeature,
   onToggleLayer,
 }) {
   const selectionAnchorRef = useRef(null);
+  const [draggedLayerId, setDraggedLayerId] = useState(null);
+  const [dropLayerId, setDropLayerId] = useState(null);
+
+  function handleLayerDragStart(event, layerId) {
+    setDraggedLayerId(layerId);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', layerId);
+  }
+
+  function handleLayerDragOver(event, layerId) {
+    if (!draggedLayerId || draggedLayerId === layerId) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDropLayerId(layerId);
+  }
+
+  function handleLayerDrop(event, targetLayerId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const sourceLayerId = draggedLayerId || event.dataTransfer.getData('text/plain');
+    if (sourceLayerId && sourceLayerId !== targetLayerId) {
+      onReorderLayer(sourceLayerId, targetLayerId);
+    }
+    setDraggedLayerId(null);
+    setDropLayerId(null);
+  }
+
+  function handleLayerDragEnd() {
+    setDraggedLayerId(null);
+    setDropLayerId(null);
+  }
 
   function handleFeatureClick(event, featureId, layerFeatures) {
     const ctrlPressed = event.ctrlKey || event.metaKey;
@@ -813,6 +847,31 @@ function LayersSection({
 
   return (
     <div className="menu-section layers-section">
+      <style>{`
+        .layer-drag-handle {
+          display: grid;
+          flex: 0 0 24px;
+          width: 24px;
+          height: 30px;
+          padding: 0;
+          place-items: center;
+          border: 0;
+          background: transparent;
+          color: #78909c;
+          font-size: 15px;
+          line-height: 1;
+          cursor: grab;
+          user-select: none;
+        }
+
+        .layer-drag-handle:active { cursor: grabbing; }
+        .layer-drag-handle:hover { color: #d8e6ec; }
+        .layer-card.is-dragging { opacity: 0.48; }
+        .layer-card.is-drop-target {
+          outline: 2px solid #477fa5;
+          outline-offset: 2px;
+        }
+      `}</style>
       <div className="section-heading-row">
         <p className="section-label">Layers</p>
         <button className="small-button" type="button" onClick={onAddLayer}>+ Add</button>
@@ -829,8 +888,30 @@ function LayersSection({
           );
 
           return (
-            <section className={`layer-card ${active ? 'is-active' : ''} ${layerHasSelection ? 'has-selection' : ''}`} key={layer.id}>
+            <section
+              className={[
+                'layer-card',
+                active ? 'is-active' : '',
+                layerHasSelection ? 'has-selection' : '',
+                draggedLayerId === layer.id ? 'is-dragging' : '',
+                dropLayerId === layer.id ? 'is-drop-target' : '',
+              ].filter(Boolean).join(' ')}
+              key={layer.id}
+              onDragOver={(event) => handleLayerDragOver(event, layer.id)}
+              onDrop={(event) => handleLayerDrop(event, layer.id)}
+            >
               <div className="layer-row">
+                <button
+                  className="layer-drag-handle"
+                  draggable
+                  type="button"
+                  title={`Drag to reorder ${layer.name}`}
+                  aria-label={`Drag to reorder ${layer.name}`}
+                  onDragStart={(event) => handleLayerDragStart(event, layer.id)}
+                  onDragEnd={handleLayerDragEnd}
+                >
+                  ⋮⋮
+                </button>
                 <span className="active-layer-dot" aria-hidden="true" />
                 <button
                   className={`visibility-button ${layer.visible ? '' : 'is-hidden'}`}
