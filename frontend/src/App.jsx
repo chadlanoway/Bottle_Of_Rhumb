@@ -565,6 +565,46 @@ export default function App() {
     setSelectedFeatureIds([]);
   }
 
+  function handleDuplicateFeature(featureId) {
+    try {
+      setError('');
+      const source = features.find((feature) => String(feature.id) === String(featureId));
+      if (!source) throw new Error('The selected feature could not be found.');
+
+      const duplicate = structuredClone(source);
+      delete duplicate.id;
+      duplicate.geometry.coordinates = offsetCoordinates(
+        duplicate.geometry.coordinates,
+        0.001,
+        -0.001,
+      );
+      duplicate.properties = {
+        ...duplicate.properties,
+        name: duplicate.properties?.name
+          ? `${duplicate.properties.name} copy`
+          : `${duplicate.geometry.type} copy`,
+      };
+      delete duplicate.properties.selected;
+      delete duplicate.properties.currentlyDrawing;
+
+      const layerId = source.properties?.layerId ?? activeLayerId;
+      const added = addDerivedGeoJSON(
+        drawRef.current,
+        { type: 'FeatureCollection', features: [duplicate] },
+        layerId,
+      );
+      const duplicateId = added.addedIds.at(-1);
+      setFeatures(added.collection.features);
+
+      if (duplicateId !== undefined) {
+        selectFeature(drawRef.current, duplicateId);
+        setSelectedFeatureIds([duplicateId]);
+      }
+    } catch (caughtError) {
+      setError(caughtError.message || 'The feature could not be duplicated.');
+    }
+  }
+
   function handleDeleteLayer(id) {
     const layer = layers.find((candidate) => candidate.id === id);
     if (!layer || layers.length === 1) return;
@@ -900,6 +940,7 @@ export default function App() {
         onApplyGeoJSON={handleApplyGeoJSON}
         onClearView={handleClearView}
         onDeleteLayer={handleDeleteLayer}
+        onDuplicateFeature={handleDuplicateFeature}
         onLayerChange={setActiveLayerId}
         onLegendChange={handleLegendChange}
         onLegendLayerChange={handleLegendLayerChange}
@@ -1034,5 +1075,17 @@ function hexToRgba(hex, opacity) {
 
 function hasFileTransfer(event) {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+}
+
+function offsetCoordinates(value, longitudeOffset, latitudeOffset) {
+  if (!Array.isArray(value)) return value;
+  if (Number.isFinite(value[0]) && Number.isFinite(value[1])) {
+    return [
+      Number((value[0] + longitudeOffset).toFixed(6)),
+      Number((value[1] + latitudeOffset).toFixed(6)),
+      ...value.slice(2),
+    ];
+  }
+  return value.map((child) => offsetCoordinates(child, longitudeOffset, latitudeOffset));
 }
 

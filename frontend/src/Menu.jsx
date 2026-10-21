@@ -294,6 +294,7 @@ export default function Menu({
   onProjectionChange,
   onClearView,
   onDeleteLayer,
+  onDuplicateFeature,
   onExport,
   onImport,
   onFitToFeatures,
@@ -365,6 +366,7 @@ export default function Menu({
               selectedFeatureIds={selectedFeatureIds}
               onAddLayer={onAddLayer}
               onDeleteLayer={onDeleteLayer}
+              onDuplicateFeature={onDuplicateFeature}
               onLayerChange={onLayerChange}
               onReorderLayer={onReorderLayer}
               onRenameLayer={onRenameLayer}
@@ -779,6 +781,7 @@ function LayersSection({
   selectedFeatureIds,
   onAddLayer,
   onDeleteLayer,
+  onDuplicateFeature,
   onLayerChange,
   onReorderLayer,
   onRenameLayer,
@@ -786,8 +789,54 @@ function LayersSection({
   onToggleLayer,
 }) {
   const selectionAnchorRef = useRef(null);
+  const contextMenuRef = useRef(null);
   const [draggedLayerId, setDraggedLayerId] = useState(null);
   const [dropLayerId, setDropLayerId] = useState(null);
+  const [featureMenu, setFeatureMenu] = useState(null);
+
+  useEffect(() => {
+    if (!featureMenu) return undefined;
+
+    function closeFeatureMenu(event) {
+      if (!contextMenuRef.current?.contains(event.target)) setFeatureMenu(null);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setFeatureMenu(null);
+    }
+
+    document.addEventListener('pointerdown', closeFeatureMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', closeFeatureMenu);
+    window.addEventListener('scroll', closeFeatureMenu, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', closeFeatureMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', closeFeatureMenu);
+      window.removeEventListener('scroll', closeFeatureMenu, true);
+    };
+  }, [featureMenu]);
+
+  function openFeatureMenu(event, feature) {
+    event.preventDefault();
+    event.stopPropagation();
+    const menuWidth = 170;
+    const menuHeight = 48;
+    setFeatureMenu({
+      featureId: feature.id,
+      name: featureListName(feature, 0),
+      x: Math.min(event.clientX, window.innerWidth - menuWidth - 8),
+      y: Math.min(event.clientY, window.innerHeight - menuHeight - 8),
+    });
+  }
+
+  function duplicateFromMenu() {
+    if (featureMenu?.featureId !== undefined) {
+      onDuplicateFeature(featureMenu.featureId);
+    }
+    setFeatureMenu(null);
+  }
 
   function handleLayerDragStart(event, layerId) {
     setDraggedLayerId(layerId);
@@ -870,6 +919,34 @@ function LayersSection({
         .layer-card.is-drop-target {
           outline: 2px solid #477fa5;
           outline-offset: 2px;
+        }
+
+        .feature-context-menu {
+          position: fixed;
+          z-index: 10060;
+          width: 170px;
+          padding: 5px;
+          border: 1px solid #536b78;
+          border-radius: 8px;
+          background: #172229;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+        }
+
+        .feature-context-menu button {
+          width: 100%;
+          padding: 8px 10px;
+          border: 0;
+          border-radius: 5px;
+          background: transparent;
+          color: #eef5f8;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .feature-context-menu button:hover,
+        .feature-context-menu button:focus-visible {
+          background: #28404d;
+          outline: none;
         }
       `}</style>
       <div className="section-heading-row">
@@ -957,6 +1034,7 @@ function LayersSection({
                           key={feature.id}
                           type="button"
                           onClick={(event) => handleFeatureClick(event, feature.id, layerFeatures)}
+                          onContextMenu={(event) => openFeatureMenu(event, feature)}
                         >
                           <span aria-hidden="true">{featureIcon(feature)}</span>
                           <span>{featureListName(feature, index)}</span>
@@ -970,6 +1048,20 @@ function LayersSection({
           );
         })}
       </div>
+
+      {featureMenu && (
+        <div
+          ref={contextMenuRef}
+          className="feature-context-menu"
+          role="menu"
+          aria-label={`Actions for ${featureMenu.name}`}
+          style={{ left: featureMenu.x, top: featureMenu.y }}
+        >
+          <button type="button" role="menuitem" onClick={duplicateFromMenu}>
+            Duplicate feature
+          </button>
+        </div>
+      )}
 
     </div>
   );
