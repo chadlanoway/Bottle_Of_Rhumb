@@ -1,15 +1,45 @@
+import * as exifr from 'exifr';
+
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp)$/i;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 let memoryDraftMapId = null;
 
+export function isSupportedPopupImage(file) {
+  return Boolean(file) && (
+    ALLOWED_TYPES.has(file.type)
+    || (file.type === '' && ALLOWED_EXTENSIONS.test(file.name ?? ''))
+  );
+}
+
+export async function readImageGps(file) {
+  if (!isSupportedPopupImage(file)) return null;
+
+  try {
+    const location = await exifr.gps(file);
+    const latitude = Number(location?.latitude);
+    const longitude = Number(location?.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+    return {
+      latitude: Number(latitude.toFixed(6)),
+      longitude: Number(longitude.toFixed(6)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadPopupImage(apiUrl, file, featureId) {
   if (!apiUrl) throw new Error('VITE_IMAGE_UPLOAD_API_URL is not configured.');
-  if (!file || !ALLOWED_TYPES.has(file.type)) {
+  if (!isSupportedPopupImage(file)) {
     throw new Error('Choose a JPEG, PNG, or WebP image.');
   }
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error('The image must be 8 MB or smaller.');
   }
+
+  const contentType = file.type || contentTypeFromName(file.name);
 
   const mapId = getDraftMapId();
   const response = await fetch(apiUrl, {
@@ -19,7 +49,7 @@ export async function uploadPopupImage(apiUrl, file, featureId) {
       action: 'create-upload',
       mapId,
       featureId: String(featureId),
-      contentType: file.type,
+      contentType,
       fileSize: file.size,
     }),
   });
@@ -29,7 +59,7 @@ export async function uploadPopupImage(apiUrl, file, featureId) {
   const upload = await fetch(payload.uploadUrl, {
     method: 'PUT',
     headers: {
-      'Content-Type': file.type,
+      'Content-Type': contentType,
       ...(payload.uploadHeaders || {}),
     },
     body: file,
@@ -41,6 +71,12 @@ export async function uploadPopupImage(apiUrl, file, featureId) {
     imageUrl: payload.imageUrl,
     mapId,
   };
+}
+
+function contentTypeFromName(name = '') {
+  if (/\.png$/i.test(name)) return 'image/png';
+  if (/\.webp$/i.test(name)) return 'image/webp';
+  return 'image/jpeg';
 }
 
 function getDraftMapId() {

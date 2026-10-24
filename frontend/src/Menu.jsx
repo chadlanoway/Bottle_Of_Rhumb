@@ -104,7 +104,6 @@ export function EditorToolbar({
   onAddressSearch,
   onLocateDevice,
   onCancelRouting,
-  onDelete,
   onDraw,
   onPreviewSearchResult,
   onSetView,
@@ -266,8 +265,14 @@ export function EditorToolbar({
         <span>{viewSaved ? 'View saved' : 'Set view'}</span>
       </button>
       <div className="toolbar-divider" />
-      <button className="tool-button danger-tool" disabled={disabled} type="button" onClick={onDelete}>
-        <span aria-hidden="true">⌫</span><span>Delete</span>
+      <button
+        className="tool-button quick-route-tool"
+        disabled={disabled || routingActive}
+        type="button"
+        onClick={onStartQuickRoute}
+        title="Place a start and destination, then edit the route"
+      >
+        <span aria-hidden="true">⤳</span><span>Quick route</span>
       </button>
       <div className="active-layer-status" title="New features will be added to this layer">
         <span>Drawing on</span>
@@ -297,6 +302,7 @@ export default function Menu({
   onProjectionChange,
   onClearView,
   onDeleteLayer,
+  onDeleteFeature,
   onDuplicateFeature,
   onExport,
   onImport,
@@ -369,6 +375,7 @@ export default function Menu({
               selectedFeatureIds={selectedFeatureIds}
               onAddLayer={onAddLayer}
               onDeleteLayer={onDeleteLayer}
+              onDeleteFeature={onDeleteFeature}
               onDuplicateFeature={onDuplicateFeature}
               onLayerChange={onLayerChange}
               onReorderLayer={onReorderLayer}
@@ -784,6 +791,7 @@ function LayersSection({
   selectedFeatureIds,
   onAddLayer,
   onDeleteLayer,
+  onDeleteFeature,
   onDuplicateFeature,
   onLayerChange,
   onReorderLayer,
@@ -951,6 +959,46 @@ function LayersSection({
           background: #28404d;
           outline: none;
         }
+
+        .feature-list-item {
+          display: flex;
+          min-width: 0;
+          gap: 4px;
+        }
+
+        .feature-list .feature-select-button {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .feature-list .delete-feature-icon {
+          display: grid;
+          flex: 0 0 30px;
+          width: 30px;
+          padding: 0;
+          place-items: center;
+          border: 1px solid transparent;
+          background: transparent;
+          color: #8fa5b0;
+        }
+
+        .feature-list .delete-feature-icon:hover,
+        .feature-list .delete-feature-icon:focus-visible {
+          border-color: rgba(224, 108, 91, .55);
+          background: rgba(224, 108, 91, .16);
+          color: #ff9a89;
+          outline: none;
+        }
+
+        .feature-list .delete-feature-icon svg {
+          width: 15px;
+          height: 15px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 1.8;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
       `}</style>
       <div className="section-heading-row">
         <p className="section-label">Layers</p>
@@ -1029,19 +1077,33 @@ function LayersSection({
                   ) : (
                     <div className="feature-list">
                       {layerFeatures.map((feature, index) => (
-                        <button
-                          className={[
-                            selectedIds.has(String(feature.id)) ? 'is-selected' : '',
-                            String(feature.id) === String(selectedFeatureId) ? 'is-primary' : '',
-                          ].filter(Boolean).join(' ')}
-                          key={feature.id}
-                          type="button"
-                          onClick={(event) => handleFeatureClick(event, feature.id, layerFeatures)}
-                          onContextMenu={(event) => openFeatureMenu(event, feature)}
-                        >
-                          <span aria-hidden="true">{featureIcon(feature)}</span>
-                          <span>{featureListName(feature, index)}</span>
-                        </button>
+                        <div className="feature-list-item" key={feature.id}>
+                          <button
+                            className={[
+                              'feature-select-button',
+                              selectedIds.has(String(feature.id)) ? 'is-selected' : '',
+                              String(feature.id) === String(selectedFeatureId) ? 'is-primary' : '',
+                            ].filter(Boolean).join(' ')}
+                            type="button"
+                            onClick={(event) => handleFeatureClick(event, feature.id, layerFeatures)}
+                            onContextMenu={(event) => openFeatureMenu(event, feature)}
+                          >
+                            <span aria-hidden="true">{featureIcon(feature)}</span>
+                            <span>{featureListName(feature, index)}</span>
+                          </button>
+                          <button
+                            className="delete-feature-icon"
+                            type="button"
+                            title={`Delete ${featureListName(feature, index)}`}
+                            aria-label={`Delete ${featureListName(feature, index)}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDeleteFeature(feature.id);
+                            }}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}

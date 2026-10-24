@@ -34,7 +34,11 @@ import {
   searchResultPoint,
   showSearchResult,
 } from './routing-tools.js';
-import { uploadPopupImage } from './image-upload.js';
+import {
+  isSupportedPopupImage,
+  readImageGps,
+  uploadPopupImage,
+} from './image-upload.js';
 import {
   isSupportedSpatialFile,
   readSpatialFile,
@@ -70,6 +74,7 @@ export default function App() {
   const quickRouteControllerRef = useRef(null);
   const searchMarkerRef = useRef(null);
   const tutorialFeatureIdsRef = useRef({ points: [], route: [] });
+  const photoPlacementCleanupRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const [features, setFeatures] = useState([]);
   const [layers, setLayers] = useState([DEFAULT_LAYER]);
@@ -86,6 +91,7 @@ export default function App() {
   const [quickRouteActive, setQuickRouteActive] = useState(false);
   const [quickRouteStatus, setQuickRouteStatus] = useState('');
   const [tutorialStep, setTutorialStep] = useState(null);
+  const [featureEditorRequest, setFeatureEditorRequest] = useState(null);
   const [legend, setLegend] = useState({
     visible: true,
     title: 'Legend',
@@ -141,6 +147,7 @@ export default function App() {
     return () => {
       routingControllerRef.current?.destroy();
       quickRouteControllerRef.current?.destroy();
+      photoPlacementCleanupRef.current?.();
       searchMarkerRef.current?.remove();
 
       if (mapRef.current) {
@@ -217,6 +224,7 @@ export default function App() {
 
   function handleDraw(type) {
     setError('');
+    photoPlacementCleanupRef.current?.();
     setSelectedFeatureIds([]);
     routingControllerRef.current?.cancel();
     quickRouteControllerRef.current?.cancel();
@@ -226,6 +234,7 @@ export default function App() {
 
   function handleStartRouting(profile, presetStart = null) {
     setError('');
+    photoPlacementCleanupRef.current?.();
     setSelectedFeatureIds([]);
     quickRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
@@ -235,6 +244,7 @@ export default function App() {
 
   function handleStartQuickRoute() {
     setError('');
+    photoPlacementCleanupRef.current?.();
     setSelectedFeatureIds([]);
     routingControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
@@ -477,6 +487,131 @@ export default function App() {
     }
   }
 
+  async function handleDroppedImage(file) {
+    try {
+      setError('');
+      const gps = await readImageGps(file);
+      if (gps) {
+        mapRef.current?.flyTo({
+          center: [gps.longitude, gps.latitude],
+          zoom: Math.max(mapRef.current.getZoom(), 14),
+          essential: true,
+        });
+        await placeDroppedImage(file, [gps.longitude, gps.latitude], true);
+        return;
+      }
+      armPhotoPlacement(file);
+    } catch (caughtError) {
+      setError(caughtError.message || 'The image could not be added to the map.');
+    }
+  }
+
+  function armPhotoPlacement(file) {
+    const map = mapRef.current;
+    if (!map) throw new Error('The map is not ready.');
+
+    photoPlacementCleanupRef.current?.();
+    routingControllerRef.current?.cancel();
+    quickRouteControllerRef.current?.cancel();
+    startDrawing(drawRef.current, 'select');
+
+    const canvas = map.getCanvas();
+    const previousCursor = canvas.style.cursor;
+    const tooltip = document.createElement('div');
+    tooltip.textContent = 'Click the map to place photo.';
+    tooltip.setAttribute('role', 'status');
+    Object.assign(tooltip.style, {
+      position: 'absolute',
+      zIndex: '31',
+      display: 'none',
+      maxWidth: '290px',
+      padding: '7px 10px',
+      border: '1px solid rgba(255,255,255,.22)',
+      borderRadius: '999px',
+      background: '#172229',
+      color: '#fff',
+      boxShadow: '0 5px 18px rgba(0,0,0,.28)',
+      font: '600 12px/1.25 Arial, Helvetica, sans-serif',
+      pointerEvents: 'none',
+      transform: 'translate(14px, 14px)',
+      whiteSpace: 'nowrap',
+    });
+    map.getContainer().appendChild(tooltip);
+    canvas.style.cursor = 'crosshair';
+
+    const move = (event) => {
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${event.point.x}px`;
+      tooltip.style.top = `${event.point.y}px`;
+    };
+    const click = (event) => {
+      const coordinates = [
+        Number(event.lngLat.lng.toFixed(6)),
+        Number(event.lngLat.lat.toFixed(6)),
+      ];
+      cleanup();
+      void placeDroppedImage(file, coordinates, false);
+    };
+    const keydown = (event) => {
+      if (event.key === 'Escape') cleanup();
+    };
+    const cleanup = () => {
+      map.off('mousemove', move);
+      map.off('click', click);
+      window.removeEventListener('keydown', keydown);
+      tooltip.remove();
+      canvas.style.cursor = previousCursor;
+      if (photoPlacementCleanupRef.current === cleanup) {
+        photoPlacementCleanupRef.current = null;
+      }
+    };
+
+    map.on('mousemove', move);
+    map.on('click', click);
+    window.addEventListener('keydown', keydown);
+    photoPlacementCleanupRef.current = cleanup;
+  }
+
+  async function placeDroppedImage(file, coordinates, usedExifGps) {
+    const imageName = file.name.replace(/\.[^.]+$/, '') || 'Map photo';
+    const collection = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates },
+        properties: {
+          name: imageName,
+          source: 'image-drop',
+          imageLocationSource: usedExifGps ? 'exif-gps' : 'map-click',
+          popupEnabled: true,
+          popupTitle: imageName,
+          popupDescription: '',
+          popupImageAlt: imageName,
+          popupImageCaption: '',
+        },
+      }],
+    };
+
+    const added = addDerivedGeoJSON(drawRef.current, collection, activeLayerIdRef.current);
+    const featureId = added.addedIds.at(-1);
+    setFeatures(added.collection.features);
+    if (featureId === undefined) throw new Error('The photo point could not be created.');
+
+    selectFeature(drawRef.current, featureId);
+    setSelectedFeatureIds([featureId]);
+    setFeatureEditorRequest({ featureId, tab: 'popup', token: crypto.randomUUID() });
+
+    try {
+      const image = await uploadPopupImage(IMAGE_UPLOAD_API_URL, file, featureId);
+      updateFeature(drawRef.current, featureId, {
+        popupImageUrl: image.imageUrl,
+        popupImageKey: image.imageKey,
+      });
+    } catch (caughtError) {
+      setError(`The point was added, but the image upload failed: ${caughtError.message}`);
+    }
+  }
+
   function handleApplyGeoJSON(collection) {
     try {
       setError('');
@@ -536,9 +671,15 @@ export default function App() {
     event.preventDefault();
     dragDepthRef.current = 0;
     setDragActive(false);
-    const file = Array.from(event.dataTransfer.files).find(isSupportedSpatialFile);
+    const files = Array.from(event.dataTransfer.files);
+    const image = files.find(isSupportedPopupImage);
+    if (image) {
+      await handleDroppedImage(image);
+      return;
+    }
+    const file = files.find(isSupportedSpatialFile);
     if (!file) {
-      setError('Drop a .geojson, .json, .kml, or .gpx file to import it as a new layer.');
+      setError('Drop a JPEG, PNG, WebP, GeoJSON, KML, or GPX file onto the map.');
       return;
     }
     await handleImport(file);
@@ -621,6 +762,14 @@ export default function App() {
     if (selectedFeatureIds.length === 0) return;
     deleteFeatures(drawRef.current, selectedFeatureIds);
     setSelectedFeatureIds([]);
+  }
+
+  function handleDeleteFeatureById(featureId) {
+    if (featureId === null || featureId === undefined) return;
+    deleteFeatures(drawRef.current, [featureId]);
+    setSelectedFeatureIds((current) => current.filter(
+      (id) => String(id) !== String(featureId),
+    ));
   }
 
   function handleDuplicateFeature(featureId) {
@@ -962,7 +1111,6 @@ export default function App() {
         activeLayer={activeLayer}
         disabled={!mapReady}
         featureCount={features.length}
-        onDelete={handleDeleteFeature}
         onDraw={handleDraw}
         onAddSearchPoint={handleAddSearchPoint}
         onAddressSearch={handleAddressSearch}
@@ -1002,6 +1150,7 @@ export default function App() {
         onApplyGeoJSON={handleApplyGeoJSON}
         onClearView={handleClearView}
         onDeleteLayer={handleDeleteLayer}
+        onDeleteFeature={handleDeleteFeatureById}
         onDuplicateFeature={handleDuplicateFeature}
         onLayerChange={setActiveLayerId}
         onLegendChange={handleLegendChange}
@@ -1027,6 +1176,7 @@ export default function App() {
         onImageUpload={handlePopupImageUpload}
         onPreview={() => previewFeaturePopup(drawRef.current, mapRef.current, selectedFeatureId, legend)}
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
+        openRequest={featureEditorRequest}
         tutorialExpanded={tutorialStep === 3 ? false : undefined}
       />
       <Tutorial
@@ -1039,8 +1189,8 @@ export default function App() {
       {dragActive && (
         <div className="geojson-drop-overlay" aria-hidden="true">
           <div>
-            <strong>Drop GeoJSON, KML, or GPX to add a layer</strong>
-            <span>The existing map will be preserved.</span>
+            <strong>Drop a map file or photo</strong>
+            <span>GeoJSON, KML, GPX, JPEG, PNG, or WebP</span>
           </div>
         </div>
       )}
