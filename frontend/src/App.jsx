@@ -11,6 +11,7 @@ import {
 } from './map.js';
 import {
   addDerivedGeoJSON,
+  createQuickRouteController,
   addGeoJSON,
   deleteFeatures,
   deleteLayerFeatures,
@@ -66,6 +67,7 @@ export default function App() {
   const activeLayerIdRef = useRef(DEFAULT_LAYER.id);
   const dragDepthRef = useRef(0);
   const routingControllerRef = useRef(null);
+  const quickRouteControllerRef = useRef(null);
   const searchMarkerRef = useRef(null);
   const tutorialFeatureIdsRef = useRef({ points: [], route: [] });
   const [mapReady, setMapReady] = useState(false);
@@ -81,6 +83,8 @@ export default function App() {
   const [projection, setProjection] = useState('globe');
   const [routingActive, setRoutingActive] = useState(false);
   const [routingStatus, setRoutingStatus] = useState('');
+  const [quickRouteActive, setQuickRouteActive] = useState(false);
+  const [quickRouteStatus, setQuickRouteStatus] = useState('');
   const [tutorialStep, setTutorialStep] = useState(null);
   const [legend, setLegend] = useState({
     visible: true,
@@ -136,6 +140,7 @@ export default function App() {
 
     return () => {
       routingControllerRef.current?.destroy();
+      quickRouteControllerRef.current?.destroy();
       searchMarkerRef.current?.remove();
 
       if (mapRef.current) {
@@ -166,6 +171,11 @@ export default function App() {
         onError: (caughtError) => setError(caughtError.message),
         onRoute: handleRouteReady,
         onStatus: setRoutingStatus,
+      });
+      quickRouteControllerRef.current = createQuickRouteController(map, {
+        onActiveChange: setQuickRouteActive,
+        onComplete: handleQuickRouteReady,
+        onStatus: setQuickRouteStatus,
       });
 
       if (restoredFeatures.length > 0) {
@@ -209,6 +219,7 @@ export default function App() {
     setError('');
     setSelectedFeatureIds([]);
     routingControllerRef.current?.cancel();
+    quickRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, type);
   }
@@ -216,9 +227,56 @@ export default function App() {
   function handleStartRouting(profile, presetStart = null) {
     setError('');
     setSelectedFeatureIds([]);
+    quickRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, 'select');
     routingControllerRef.current?.arm(profile, presetStart);
+  }
+
+  function handleStartQuickRoute() {
+    setError('');
+    setSelectedFeatureIds([]);
+    routingControllerRef.current?.cancel();
+    mapRef.current?.rhumbWeatherControl?.disableWeather();
+    startDrawing(drawRef.current, 'select');
+    quickRouteControllerRef.current?.arm();
+  }
+
+  function handleQuickRouteReady(start, end) {
+    try {
+      const collection = {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { name: 'Route start', routeRole: 'start', source: 'quick-route' },
+            geometry: { type: 'Point', coordinates: start },
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Route destination', routeRole: 'destination', source: 'quick-route' },
+            geometry: { type: 'Point', coordinates: end },
+          },
+          {
+            type: 'Feature',
+            properties: { name: 'Quick route', routeRole: 'route', source: 'quick-route' },
+            geometry: { type: 'LineString', coordinates: [start, end] },
+          },
+        ],
+      };
+      const added = addDerivedGeoJSON(drawRef.current, collection, activeLayerIdRef.current);
+      setFeatures(added.collection.features);
+      const routeId = added.addedIds.at(-1);
+      if (routeId !== undefined) {
+        startDrawing(drawRef.current, 'select');
+        selectFeature(drawRef.current, routeId);
+        setSelectedFeatureIds([routeId]);
+      }
+      setQuickRouteStatus('Route selected. Drag vertices or midpoint handles to adjust it.');
+      window.setTimeout(() => setQuickRouteStatus(''), 6000);
+    } catch (caughtError) {
+      setError(caughtError.message || 'The quick route could not be created.');
+    }
   }
 
   async function handleRouteReady(payload, profile) {
@@ -909,13 +967,17 @@ export default function App() {
         onAddSearchPoint={handleAddSearchPoint}
         onAddressSearch={handleAddressSearch}
         onLocateDevice={handleLocateDevice}
-        onCancelRouting={() => routingControllerRef.current?.cancel()}
+        onCancelRouting={() => {
+          routingControllerRef.current?.cancel();
+          quickRouteControllerRef.current?.cancel();
+        }}
         onPreviewSearchResult={handlePreviewSearchResult}
         onSetView={handleSaveView}
         onStartRouting={handleStartRouting}
+        onStartQuickRoute={handleStartQuickRoute}
         onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
-        routingActive={routingActive}
-        routingStatus={routingStatus}
+        routingActive={routingActive || quickRouteActive}
+        routingStatus={quickRouteStatus || routingStatus}
         viewSaved={Boolean(savedView)}
         tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
       />

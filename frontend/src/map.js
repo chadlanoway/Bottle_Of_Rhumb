@@ -39,7 +39,7 @@ export function createMap(container, basemapId = 'positron', options = {}) {
     container,
     style: getBasemap(basemapId).style,
     center: [3, 60],
-    zoom: 3,
+    zoom: 3.5,
     attributionControl: true,
   });
 

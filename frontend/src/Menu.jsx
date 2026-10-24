@@ -8,6 +8,7 @@ const DRAW_ACTIONS = [
   { type: 'polygon', label: 'Polygon', icon: '⬡' },
   { type: 'text', label: 'Text', icon: 'T' },
   { type: 'circle', label: 'Circle', icon: '○' },
+  { type: 'quick-route', label: 'Quick route', icon: '⤳' },
   { type: 'land-route', label: 'Land route', icon: '⇢' },
 ];
 
@@ -108,6 +109,7 @@ export function EditorToolbar({
   onPreviewSearchResult,
   onSetView,
   onStartRouting,
+  onStartQuickRoute,
   onUseSearchAsRouteStart,
   routingActive,
   routingStatus,
@@ -138,6 +140,7 @@ export function EditorToolbar({
   function chooseTool(type) {
     setDrawMenuOpen(false);
     if (type === 'land-route') onStartRouting(routeProfile);
+    else if (type === 'quick-route') onStartQuickRoute();
     else onDraw(type);
   }
 
@@ -250,7 +253,7 @@ export function EditorToolbar({
       </button>
 
       {routingActive && (
-        <button className="tool-button route-cancel-button" type="button" onClick={onCancelRouting} title="Cancel land routing">
+        <button className="tool-button route-cancel-button" type="button" onClick={onCancelRouting} title="Cancel route tool">
           <span aria-hidden="true">×</span><span>Cancel route</span>
         </button>
       )}

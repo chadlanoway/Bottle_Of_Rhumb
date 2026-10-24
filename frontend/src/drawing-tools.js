@@ -1,4 +1,5 @@
 import { MaplibreTerradrawControl } from '@watergis/maplibre-gl-terradraw';
+import { TerraDrawSelectMode } from 'terra-draw';
 import { Marker, Popup } from 'maplibre-gl';
 import '@watergis/maplibre-gl-terradraw/dist/maplibre-gl-terradraw.css';
 
@@ -26,10 +27,165 @@ const DOTTED_POLYGON_LAYER = 'bottle-of-rhumb-dotted-polygons';
 const backgroundMarkerStates = new WeakMap();
 const previewPopups = new WeakMap();
 const selectionIntents = new WeakMap();
+const QUICK_ROUTE_SOURCE = 'bottle-of-rhumb-quick-route-preview';
+const QUICK_ROUTE_CASING = 'bottle-of-rhumb-quick-route-preview-casing';
+const QUICK_ROUTE_LINE = 'bottle-of-rhumb-quick-route-preview-line';
+
+export function createQuickRouteController(map, options = {}) {
+  let active = false;
+  let start = null;
+  let previousCursor = '';
+
+  const tooltip = document.createElement('div');
+  tooltip.setAttribute('role', 'status');
+  Object.assign(tooltip.style, {
+    position: 'absolute',
+    zIndex: '30',
+    display: 'none',
+    maxWidth: '230px',
+    padding: '7px 10px',
+    border: '1px solid rgba(255,255,255,.22)',
+    borderRadius: '999px',
+    background: '#172229',
+    color: '#fff',
+    boxShadow: '0 5px 18px rgba(0,0,0,.28)',
+    font: '600 12px/1.25 Arial, Helvetica, sans-serif',
+    pointerEvents: 'none',
+    transform: 'translate(14px, 14px)',
+    whiteSpace: 'nowrap',
+  });
+  map.getContainer().appendChild(tooltip);
+
+  function ensurePreview() {
+    if (!map.getSource(QUICK_ROUTE_SOURCE)) {
+      map.addSource(QUICK_ROUTE_SOURCE, { type: 'geojson', data: EMPTY_COLLECTION });
+    }
+    if (!map.getLayer(QUICK_ROUTE_CASING)) {
+      map.addLayer({
+        id: QUICK_ROUTE_CASING,
+        type: 'line',
+        source: QUICK_ROUTE_SOURCE,
+        paint: { 'line-color': '#ffffff', 'line-width': 6, 'line-opacity': 0.9 },
+      });
+    }
+    if (!map.getLayer(QUICK_ROUTE_LINE)) {
+      map.addLayer({
+        id: QUICK_ROUTE_LINE,
+        type: 'line',
+        source: QUICK_ROUTE_SOURCE,
+        paint: {
+          'line-color': '#1e90ff',
+          'line-width': 3,
+          'line-dasharray': [2, 2],
+        },
+      });
+    }
+  }
+
+  function setPreview(end) {
+    const source = map.getSource(QUICK_ROUTE_SOURCE);
+    if (!source) return;
+    source.setData(start && end ? {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: [start, end] },
+    } : EMPTY_COLLECTION);
+  }
+
+  function setInstruction(message) {
+    tooltip.textContent = message;
+    options.onStatus?.(message);
+  }
+
+  function handleMouseMove(event) {
+    if (!active) return;
+    tooltip.style.display = 'block';
+    tooltip.style.left = `${event.point.x}px`;
+    tooltip.style.top = `${event.point.y}px`;
+    if (start) setPreview([event.lngLat.lng, event.lngLat.lat]);
+  }
+
+  function handleClick(event) {
+    if (!active) return;
+    const coordinate = [
+      Number(event.lngLat.lng.toFixed(6)),
+      Number(event.lngLat.lat.toFixed(6)),
+    ];
+    if (!start) {
+      start = coordinate;
+      setPreview(coordinate);
+      setInstruction('Click the destination');
+      return;
+    }
+
+    const routeStart = start;
+    cancel();
+    options.onComplete?.(routeStart, coordinate);
+  }
+
+  function handleKeyDown(event) {
+    if (active && event.key === 'Escape') cancel();
+  }
+
+  function arm() {
+    if (active) cancel();
+    ensurePreview();
+    active = true;
+    start = null;
+    previousCursor = map.getCanvas().style.cursor;
+    map.getCanvas().style.cursor = 'crosshair';
+    tooltip.style.display = 'none';
+    setInstruction('Click the route’s starting point');
+    options.onActiveChange?.(true);
+  }
+
+  function cancel() {
+    if (!active) return;
+    active = false;
+    start = null;
+    setPreview(null);
+    tooltip.style.display = 'none';
+    map.getCanvas().style.cursor = previousCursor;
+    options.onStatus?.('');
+    options.onActiveChange?.(false);
+  }
+
+  function destroy() {
+    cancel();
+    map.off('mousemove', handleMouseMove);
+    map.off('click', handleClick);
+    window.removeEventListener('keydown', handleKeyDown);
+    tooltip.remove();
+  }
+
+  map.on('mousemove', handleMouseMove);
+  map.on('click', handleClick);
+  window.addEventListener('keydown', handleKeyDown);
+
+  return { arm, cancel, destroy, get active() { return active; } };
+}
 
 export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionChange) {
   const draw = new MaplibreTerradrawControl({
     modes: ['point', 'linestring', 'polygon', 'circle', 'text', 'select'],
+    modeOptions: {
+      select: new TerraDrawSelectMode({
+        flags: {
+          linestring: {
+            feature: {
+              draggable: true,
+              coordinates: {
+                draggable: true,
+                deletable: true,
+                midpoints: {
+                  draggable: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    },
     open: true,
   });
 
