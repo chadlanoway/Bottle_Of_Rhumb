@@ -505,6 +505,8 @@ select:focus-visible {
 
 .app-menu {
   position: absolute;
+  display: flex;
+  flex-direction: column;
   z-index: 20;
   top: calc(var(--header-height) + var(--toolbar-height) + 12px);
   bottom: 12px;
@@ -576,7 +578,8 @@ select:focus-visible {
 }
 
 .menu-section {
-  max-height: calc(100vh - 166px);
+  min-height: 0;
+  flex: 1;
   padding: 14px;
   overflow-y: auto;
 }
@@ -2786,6 +2789,7 @@ button:disabled {
 .share-section {
   display: grid;
   gap: 10px;
+  padding-bottom: 28px;
 }
 
 .share-signin-card,

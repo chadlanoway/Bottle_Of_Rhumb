@@ -24,6 +24,7 @@ import {
   setHiddenLayers,
   setMultiSelectedFeatures,
   setupDrawingTools,
+  setupViewerFeatureInteractions,
   startDrawing,
   updateFeature,
 } from './drawing-tools.js';
@@ -269,6 +270,13 @@ export default function App() {
         handleSelectionChange,
       );
       drawRef.current = draw;
+      if (viewerMode) {
+        setupViewerFeatureInteractions(
+          draw,
+          map,
+          () => legendRef.current,
+        );
+      }
       routingControllerRef.current = createLandRoutingController(map, {
         apiUrl: LAND_ROUTING_API_URL,
         onActiveChange: setRoutingActive,

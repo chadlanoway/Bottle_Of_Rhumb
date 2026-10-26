@@ -193,6 +193,9 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
 
   const engine = draw.getTerraDrawInstance();
   ensureTextLayers(map);
+  const keepNativeTextHidden = () => suppressNativeTextLayer(map);
+  map.on('styledata', keepNativeTextHidden);
+  map.once('remove', () => map.off('styledata', keepNativeTextHidden));
   ensureMultiSelectionLayers(map);
   ensureFeatureAppearance(map);
   keepPointLayersAbovePolygons(map);
@@ -358,6 +361,72 @@ export function previewFeaturePopup(draw, map, id, styleDefaults = {}) {
     .addTo(map);
   applyPopupStyle(popup, feature.properties, styleDefaults);
   previewPopups.set(map, popup);
+}
+
+export function setupViewerFeatureInteractions(draw, map, getStyleDefaults) {
+  const hitLayerIds = [
+    'td-point',
+    'td-point-marker',
+    'td-linestring',
+    'td-polygon',
+    'td-polygon-outline',
+    DASHED_LINE_LAYER,
+    DOTTED_LINE_LAYER,
+    DASHED_POLYGON_LAYER,
+    DOTTED_POLYGON_LAYER,
+    FEATURE_LABEL_LAYER,
+    FREE_TEXT_LAYER,
+  ];
+
+  const popupFeatureAt = (point) => {
+    const layers = hitLayerIds.filter((layerId) => map.getLayer(layerId));
+    if (layers.length === 0) return null;
+
+    const rendered = map.queryRenderedFeatures(
+      [
+        [point.x - 7, point.y - 7],
+        [point.x + 7, point.y + 7],
+      ],
+      { layers },
+    );
+    const snapshot = draw?.getTerraDrawInstance()?.getSnapshot() ?? [];
+
+    for (const renderedFeature of rendered) {
+      const renderedId = renderedFeature.id ?? renderedFeature.properties?.id;
+      if (renderedId === null || renderedId === undefined) continue;
+      const feature = snapshot.find(
+        (candidate) => String(candidate.id) === String(renderedId),
+      );
+      if (feature?.properties?.popupEnabled) return feature;
+    }
+
+    return null;
+  };
+
+  const handleMouseMove = (event) => {
+    map.getCanvas().style.cursor = popupFeatureAt(event.point) ? 'pointer' : '';
+  };
+  const handleMouseLeave = () => {
+    map.getCanvas().style.cursor = '';
+  };
+  const handleClick = (event) => {
+    const feature = popupFeatureAt(event.point);
+    if (!feature) return;
+    previewFeaturePopup(draw, map, feature.id, getStyleDefaults?.() ?? {});
+  };
+
+  map.on('mousemove', handleMouseMove);
+  map.on('mouseout', handleMouseLeave);
+  map.on('click', handleClick);
+
+  const destroy = () => {
+    map.off('mousemove', handleMouseMove);
+    map.off('mouseout', handleMouseLeave);
+    map.off('click', handleClick);
+    map.getCanvas().style.cursor = '';
+  };
+  map.once('remove', destroy);
+  return destroy;
 }
 
 export function setHiddenLayers(draw, map, hiddenLayerIds) {
@@ -722,8 +791,7 @@ function ensureTextLayers(map) {
 function updateTextSource(map, collection) {
   map.getSource(TEXT_SOURCE)?.setData(collection);
   syncBackgroundMarkers(map, collection);
-  hideNativeTextLayer(map);
-  requestAnimationFrame(() => hideNativeTextLayer(map));
+  suppressNativeTextLayer(map);
 }
 
 function featureLabelFilter() {
@@ -735,9 +803,20 @@ function freeTextFilter() {
 }
 
 function hideNativeTextLayer(map) {
-  if (map.getLayer('td-text-labels')) {
+  if (
+    map.getLayer('td-text-labels')
+    && map.getLayoutProperty('td-text-labels', 'visibility') !== 'none'
+  ) {
     map.setLayoutProperty('td-text-labels', 'visibility', 'none');
   }
+}
+
+function suppressNativeTextLayer(map) {
+  hideNativeTextLayer(map);
+  queueMicrotask(() => hideNativeTextLayer(map));
+  requestAnimationFrame(() => hideNativeTextLayer(map));
+  setTimeout(() => hideNativeTextLayer(map), 50);
+  setTimeout(() => hideNativeTextLayer(map), 250);
 }
 
 function syncBackgroundMarkers(map, collection) {
