@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.zip
+cache
+data/*
+!data/tiles/
+data/tiles/*
+!data/tiles/global_coarse_10km.tif
+!data/source/
+data/source/*
+!data/source/land_polygons_indexed.gpkg

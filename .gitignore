@@ -1,0 +1,43 @@
+# JavaScript dependencies and generated builds
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Python environments and caches
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+
+# Local environment files. Keep safe templates in Git.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Large source and generated routing datasets/caches
+/water-routing/data/
+/water-routing/cache/
+/bottle-of-rhumb-water-api-v2/data/
+/bottle-of-rhumb-water-api-v2/cache/
+
+# Local deployment configuration
+/water-routing/cloud-run-env.yaml
+/bottle-of-rhumb-water-api-v2/cloud-run-env.yaml
+
+# Local archives and logs
+*.zip
+*.log
+npm-debug.log*
+
+# GIS temporary/sidecar files
+*.qmd
+*.qpj
+*.aux.xml
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

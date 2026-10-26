@@ -2781,3 +2781,135 @@ button:disabled {
     animation: none;
   }
 }
+
+/* Save, publish, and embed */
+.share-section {
+  display: grid;
+  gap: 10px;
+}
+
+.share-signin-card,
+.share-output-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045);
+}
+
+.share-signin-card p,
+.share-note,
+.share-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.share-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: .78rem;
+}
+
+.share-account-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-account-row button,
+.share-copy-row button,
+.share-output-card > button {
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+  color: white;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.share-section > input,
+.share-description,
+.share-copy-row input,
+.share-output-card textarea {
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  background: #0e181d;
+  color: white;
+  padding: 7px 8px;
+}
+
+.share-description {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.share-publish-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  background: rgba(30, 144, 255, .08);
+}
+
+.share-publish-toggle input {
+  margin-top: 3px;
+}
+
+.share-publish-toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.share-publish-toggle small {
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.share-copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.share-copy-row input {
+  min-width: 0;
+}
+
+.share-output-card textarea {
+  min-height: 96px;
+  resize: vertical;
+  font: .72rem/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.share-output-card a {
+  color: #7ebcff;
+  font-size: .82rem;
+}
+
+.share-embed-label {
+  margin-top: 5px;
+}
+
+/* Read-only links and iframes use the whole map instead of editor offsets. */
+.is-viewer .map-legend--top-left {
+  top: 12px;
+  left: 12px;
+}
+
+.is-viewer .map-legend--top-right {
+  top: 12px;
+}
+
+.is-viewer .map-legend--bottom-left {
+  left: 12px;
+}

@@ -1,0 +1,17 @@
+services:
+  water-routing-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      MAX_CONCURRENT_ROUTES: "1"
+      QUEUE_WAIT_SECONDS: "10"
+      ROUTE_TIMEOUT_SECONDS: "900"
+      CORS_ORIGINS: "http://localhost:5173,https://bottleofrhumb.com,https://www.bottleofrhumb.com,https://chadlanoway.github.io"
+    volumes:
+      - ./data:/app/data:ro
+      - route-cache:/app/cache
+    restart: unless-stopped
+
+volumes:
+  route-cache:

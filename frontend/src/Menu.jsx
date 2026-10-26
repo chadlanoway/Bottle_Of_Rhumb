@@ -287,6 +287,7 @@ export function EditorToolbar({
 }
 
 export default function Menu({
+  authSession,
   activeLayerId,
   basemapId,
   basemaps,
@@ -295,6 +296,12 @@ export default function Menu({
   features,
   layers,
   legend,
+  mapDescription,
+  mapId,
+  mapTitle,
+  mapVisibility,
+  ownsMap,
+  saveStatus,
   savedView,
   selectedFeatureId,
   selectedFeatureIds,
@@ -319,6 +326,13 @@ export default function Menu({
   onSaveView,
   onSelectFeature,
   onToggleLayer,
+  onCreateAccount,
+  onMapDescriptionChange,
+  onMapTitleChange,
+  onMapVisibilityChange,
+  onSaveMap,
+  onSignIn,
+  onSignOut,
   tutorialExpanded,
   tutorialSection,
 }) {
@@ -421,16 +435,174 @@ export default function Menu({
           )}
 
           {activeSection === 'share' && (
-            <div className="menu-section empty-section">
-              <span className="coming-soon">Coming next</span>
-              <h2>{activeSection}</h2>
-              <p>Saving, screenshots, links, and embed code will live here.</p>
-            </div>
+            <ShareSection
+              authSession={authSession}
+              disabled={disabled}
+              mapDescription={mapDescription}
+              mapId={mapId}
+              mapTitle={mapTitle}
+              mapVisibility={mapVisibility}
+              ownsMap={ownsMap}
+              saveStatus={saveStatus}
+              onCreateAccount={onCreateAccount}
+              onMapDescriptionChange={onMapDescriptionChange}
+              onMapTitleChange={onMapTitleChange}
+              onMapVisibilityChange={onMapVisibilityChange}
+              onSaveMap={onSaveMap}
+              onSignIn={onSignIn}
+              onSignOut={onSignOut}
+            />
           )}
         </>
       )}
     </aside>
   );
+}
+
+function ShareSection({
+  authSession,
+  disabled,
+  mapDescription,
+  mapId,
+  mapTitle,
+  mapVisibility,
+  ownsMap,
+  saveStatus,
+  onCreateAccount,
+  onMapDescriptionChange,
+  onMapTitleChange,
+  onMapVisibilityChange,
+  onSaveMap,
+  onSignIn,
+  onSignOut,
+}) {
+  const [copyMessage, setCopyMessage] = useState('');
+  const viewerUrl = mapId ? makeMapUrl(mapId, 'view') : '';
+  const embedUrl = mapId ? makeMapUrl(mapId, 'embed') : '';
+  const embedCode = embedUrl
+    ? `<iframe src="${embedUrl}" title="${escapeAttribute(mapTitle || 'Interactive map')}" width="100%" height="600" loading="lazy" allowfullscreen></iframe>`
+    : '';
+
+  async function copy(value, label) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyMessage(`${label} copied.`);
+    } catch {
+      setCopyMessage('Copy failed. Select the text and copy it manually.');
+    }
+  }
+
+  return (
+    <div className="menu-section share-section">
+      <p className="section-label">Save and share</p>
+
+      {!authSession ? (
+        <div className="share-signin-card">
+          <strong>Sign in to save maps</strong>
+          <p>Drafts are private. Published maps can be opened by anyone with the link.</p>
+          <button className="primary-map-button" type="button" onClick={onSignIn}>Sign in</button>
+          <button className="secondary-button" type="button" onClick={onCreateAccount}>Create account</button>
+        </div>
+      ) : (
+        <>
+          <div className="share-account-row">
+            <span title={authSession.email}>{authSession.email}</span>
+            <button type="button" onClick={onSignOut}>Sign out</button>
+          </div>
+
+          {!ownsMap && mapId && (
+            <p className="share-note">
+              This is someone else’s published map. Saving creates your own copy.
+            </p>
+          )}
+
+          <label className="field-label" htmlFor="map-title">Map title</label>
+          <input
+            id="map-title"
+            maxLength="120"
+            value={mapTitle}
+            onChange={(event) => onMapTitleChange(event.target.value)}
+          />
+
+          <label className="field-label" htmlFor="map-description">Description</label>
+          <textarea
+            id="map-description"
+            className="share-description"
+            maxLength="1000"
+            value={mapDescription}
+            onChange={(event) => onMapDescriptionChange(event.target.value)}
+          />
+
+          <label className="share-publish-toggle">
+            <input
+              type="checkbox"
+              checked={mapVisibility === 'published'}
+              onChange={(event) => onMapVisibilityChange(
+                event.target.checked ? 'published' : 'draft',
+              )}
+            />
+            <span>
+              <strong>Publish map</strong>
+              <small>Anyone with the link can view a published map.</small>
+            </span>
+          </label>
+
+          <button
+            className="primary-map-button"
+            disabled={disabled}
+            type="button"
+            onClick={onSaveMap}
+          >
+            {mapId && ownsMap ? 'Save changes' : 'Save map'}
+          </button>
+          {saveStatus && <p className="share-status" role="status">{saveStatus}</p>}
+        </>
+      )}
+
+      {mapId && mapVisibility === 'published' && (
+        <div className="share-output-card">
+          <p className="section-label">Published viewer link</p>
+          <div className="share-copy-row">
+            <input readOnly value={viewerUrl} aria-label="Published map URL" />
+            <button type="button" onClick={() => copy(viewerUrl, 'Link')}>Copy</button>
+          </div>
+          <a href={viewerUrl} target="_blank" rel="noopener noreferrer">
+            Open read-only map
+          </a>
+
+          <p className="section-label share-embed-label">Embed code</p>
+          <textarea readOnly value={embedCode} aria-label="Map iframe embed code" />
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => copy(embedCode, 'Embed code')}
+          >
+            Copy embed code
+          </button>
+          <p className="share-note">
+            Embed code works on websites that permit iframes. Social networks normally use the viewer link.
+          </p>
+          {copyMessage && <p className="share-status" role="status">{copyMessage}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function makeMapUrl(mapId, mode) {
+  const url = new URL(import.meta.env.BASE_URL, window.location.origin);
+  url.searchParams.set('map', mapId);
+  url.searchParams.set(mode, '1');
+  return url.toString();
+}
+
+function escapeAttribute(value) {
+  return String(value).replace(/[&"<>]/g, (character) => ({
+    '&': '&amp;',
+    '"': '&quot;',
+    '<': '&lt;',
+    '>': '&gt;',
+  })[character]);
 }
 
 function DataSection({

@@ -45,6 +45,12 @@ import {
   readSpatialFile,
   spatialFileLayerName,
 } from './file-import.js';
+import { initializeAuth, signIn, signOut } from './auth.js';
+import {
+  createMap as createSavedMap,
+  loadMap as loadSavedMap,
+  updateMap as updateSavedMap,
+} from './map-storage.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -99,6 +105,14 @@ export default function App() {
   const [waterRouteLoading, setWaterRouteLoading] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(null);
   const [featureEditorRequest, setFeatureEditorRequest] = useState(null);
+  const [authSession, setAuthSession] = useState(null);
+  const [mapId, setMapId] = useState(null);
+  const [mapRevision, setMapRevision] = useState(0);
+  const [ownsMap, setOwnsMap] = useState(false);
+  const [mapTitle, setMapTitle] = useState('Untitled map');
+  const [mapDescription, setMapDescription] = useState('');
+  const [mapVisibility, setMapVisibility] = useState('draft');
+  const [saveStatus, setSaveStatus] = useState('');
   const [legend, setLegend] = useState({
     visible: true,
     title: 'Legend',
@@ -111,9 +125,15 @@ export default function App() {
     glowColor: '#1e90ff',
     glowSize: 18,
   });
+  const legendRef = useRef(legend);
+  legendRef.current = legend;
 
   activeLayerIdRef.current = activeLayerId;
   const selectedFeatureId = selectedFeatureIds.at(-1) ?? null;
+  const query = new URLSearchParams(window.location.search);
+  const viewerMode = Boolean(query.get('map'))
+    && (query.get('view') === '1' || query.get('embed') === '1');
+  const embedMode = query.get('embed') === '1';
 
   useEffect(() => {
     const hiddenLayerIds = layers
@@ -145,13 +165,74 @@ export default function App() {
   }, [legend]);
 
   useEffect(() => {
-    try {
-      mountMap(basemapId, [], [DEFAULT_LAYER], null);
-    } catch (caughtError) {
-      setError(caughtError.message);
+    let cancelled = false;
+
+    async function initialize() {
+      let session = null;
+      try {
+        session = await initializeAuth();
+        if (cancelled) return;
+        setAuthSession(session);
+      } catch (caughtError) {
+        if (!cancelled) setError(caughtError.message);
+      }
+
+      const requestedMapId = new URLSearchParams(window.location.search).get('map');
+      if (!requestedMapId) {
+        if (!cancelled) mountMap(basemapId, [], [DEFAULT_LAYER], null);
+        return;
+      }
+
+      try {
+        const loaded = await loadSavedMap(requestedMapId, session?.accessToken);
+        if (cancelled) return;
+        const document = loaded.map;
+        const restoredLayers = document.layers?.length
+          ? document.layers
+          : [DEFAULT_LAYER];
+        const restoredFeatures = document.featureCollection?.features ?? [];
+        const restoredActiveLayerId = restoredLayers.some(
+          (layer) => layer.id === document.activeLayerId,
+        )
+          ? document.activeLayerId
+          : restoredLayers[0].id;
+
+        activeLayerIdRef.current = restoredActiveLayerId;
+        setActiveLayerId(restoredActiveLayerId);
+        setLayers(restoredLayers);
+        setFeatures(restoredFeatures);
+        setBasemapId(document.basemapId || 'positron');
+        setProjection(document.projection === 'globe' ? 'globe' : 'mercator');
+        setSavedView(document.view || null);
+        if (document.legend) {
+          setLegend((current) => ({ ...current, ...document.legend }));
+        }
+        setMapId(document.mapId);
+        setMapRevision(document.revision || 0);
+        setOwnsMap(loaded.editable);
+        setMapTitle(document.title || 'Untitled map');
+        setMapDescription(document.description || '');
+        setMapVisibility(document.visibility || 'draft');
+
+        mountMap(
+          document.basemapId || 'positron',
+          restoredFeatures,
+          restoredLayers,
+          null,
+          document.view || null,
+          document.projection || 'mercator',
+        );
+      } catch (caughtError) {
+        if (cancelled) return;
+        setError(caughtError.message);
+        mountMap(basemapId, [], [DEFAULT_LAYER], null);
+      }
     }
 
+    initialize();
+
     return () => {
+      cancelled = true;
       routingControllerRef.current?.destroy();
       quickRouteControllerRef.current?.destroy();
       waterRouteControllerRef.current?.destroy();
@@ -166,10 +247,17 @@ export default function App() {
     };
   }, []);
 
-  function mountMap(nextBasemapId, restoredFeatures, restoredLayers, restoredSelection) {
+  function mountMap(
+    nextBasemapId,
+    restoredFeatures,
+    restoredLayers,
+    restoredSelection,
+    restoredView = null,
+    restoredProjection = projection,
+  ) {
     const map = createMap(mapContainerRef.current, nextBasemapId, {
       onAddReferencePoint: handleAddReferencePoint,
-      projection,
+      projection: restoredProjection,
     });
     mapRef.current = map;
 
@@ -228,6 +316,7 @@ export default function App() {
         hiddenLayerIds,
         restoredPrimary,
       );
+      if (restoredView) previewMapView(map, restoredView);
       setMapReady(true);
     });
 
@@ -895,6 +984,15 @@ export default function App() {
       return;
     }
 
+    if (viewerMode) {
+      previewFeaturePopup(
+        drawRef.current,
+        mapRef.current,
+        id,
+        legendRef.current,
+      );
+    }
+
     setSelectedFeatureIds((current) => {
       if (!additive) return [id];
       const alreadySelected = current.some((candidate) => String(candidate) === String(id));
@@ -1048,6 +1146,7 @@ export default function App() {
     const restoredFeatures = features.map((feature) => structuredClone(feature));
     const restoredLayers = layers.map((layer) => ({ ...layer }));
     const restoredSelection = [...selectedFeatureIds];
+    const restoredView = getMapView(mapRef.current);
 
     setMapReady(false);
     routingControllerRef.current?.destroy();
@@ -1067,7 +1166,14 @@ export default function App() {
     mapRef.current = null;
     mapContainerRef.current?.replaceChildren();
 
-    mountMap(nextId, restoredFeatures, restoredLayers, restoredSelection);
+    mountMap(
+      nextId,
+      restoredFeatures,
+      restoredLayers,
+      restoredSelection,
+      restoredView,
+      projection,
+    );
     setBasemapId(nextId);
   }
 
@@ -1085,6 +1191,63 @@ export default function App() {
     setLayers((current) => current.map((layer) => (
       layer.id === id ? { ...layer, ...changes } : layer
     )));
+  }
+
+  function buildSavedDocument() {
+    return {
+      title: mapTitle,
+      description: mapDescription,
+      visibility: mapVisibility,
+      basemapId,
+      projection,
+      view: savedView || getMapView(mapRef.current),
+      legend,
+      layers,
+      activeLayerId,
+      featureCollection: {
+        type: 'FeatureCollection',
+        features,
+      },
+      revision: mapRevision,
+    };
+  }
+
+  async function handleSaveMap() {
+    if (!authSession?.accessToken) {
+      setSaveStatus('Sign in before saving this map.');
+      return;
+    }
+
+    setSaveStatus('Saving map…');
+    try {
+      const document = buildSavedDocument();
+      const saved = mapId && ownsMap
+        ? await updateSavedMap(mapId, document, authSession.accessToken)
+        : await createSavedMap(document, authSession.accessToken);
+
+      setMapId(saved.mapId);
+      setMapRevision(saved.revision);
+      setOwnsMap(true);
+      setMapVisibility(saved.visibility);
+      setSaveStatus(saved.visibility === 'published'
+        ? 'Map saved and published.'
+        : 'Draft saved.');
+
+      const url = new URL(window.location.href);
+      url.search = '';
+      url.searchParams.set('map', saved.mapId);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch (caughtError) {
+      setSaveStatus(caughtError.message || 'The map could not be saved.');
+    }
+  }
+
+  async function handleSignIn(mode = 'login') {
+    try {
+      await signIn(mode);
+    } catch (caughtError) {
+      setError(caughtError.message);
+    }
   }
 
   function handleRenameLayer(id, name) {
@@ -1258,48 +1421,53 @@ export default function App() {
 
   return (
     <main
-      className={`app-shell ${dragActive ? 'is-dragging-file' : ''}`}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
+      className={`app-shell ${dragActive ? 'is-dragging-file' : ''} ${viewerMode ? 'is-viewer' : ''} ${embedMode ? 'is-embed' : ''}`}
+      onDragEnter={viewerMode ? undefined : handleDragEnter}
+      onDragLeave={viewerMode ? undefined : handleDragLeave}
+      onDragOver={viewerMode ? undefined : handleDragOver}
+      onDrop={viewerMode ? undefined : handleDrop}
     >
       <div ref={mapContainerRef} className="map-canvas" />
       <MapLegend legend={legend} layers={layers} features={features} />
-      <AppHeader
-        onStartTutorial={() => showTutorialStep(0)}
-        tutorialActive={tutorialStep !== null}
-      />
-      <EditorToolbar
-        activeLayer={activeLayer}
-        disabled={!mapReady}
-        featureCount={features.length}
-        onDraw={handleDraw}
-        onAddSearchPoint={handleAddSearchPoint}
-        onAddressSearch={handleAddressSearch}
-        onLocateDevice={handleLocateDevice}
-        onCancelRouting={handleCancelRouting}
-        onPreviewSearchResult={handlePreviewSearchResult}
-        onSetView={handleSaveView}
-        onStartRouting={handleStartRouting}
-        onStartQuickRoute={handleStartQuickRoute}
-        onStartWaterRoute={handleStartWaterRoute}
-        onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
-        routingActive={routingActive || quickRouteActive || waterRouteActive || waterRouteLoading}
-        routingStatus={waterRouteStatus || quickRouteStatus || routingStatus}
-        viewSaved={Boolean(savedView)}
-        tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
-      />
+      {!viewerMode && (
+        <>
+          <AppHeader
+            onStartTutorial={() => showTutorialStep(0)}
+            tutorialActive={tutorialStep !== null}
+          />
+          <EditorToolbar
+            activeLayer={activeLayer}
+            disabled={!mapReady}
+            featureCount={features.length}
+            onDraw={handleDraw}
+            onAddSearchPoint={handleAddSearchPoint}
+            onAddressSearch={handleAddressSearch}
+            onLocateDevice={handleLocateDevice}
+            onCancelRouting={handleCancelRouting}
+            onPreviewSearchResult={handlePreviewSearchResult}
+            onSetView={handleSaveView}
+            onStartRouting={handleStartRouting}
+            onStartQuickRoute={handleStartQuickRoute}
+            onStartWaterRoute={handleStartWaterRoute}
+            onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
+            routingActive={routingActive || quickRouteActive || waterRouteActive || waterRouteLoading}
+            routingStatus={waterRouteStatus || quickRouteStatus || routingStatus}
+            viewSaved={Boolean(savedView)}
+            tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
+          />
+        </>
+      )}
       {waterRouteLoading && (
         <div className="water-route-loading" role="status" aria-live="polite">
           <span className="water-route-spinner" aria-hidden="true" />
           <div>
             <strong>Calculating water route…</strong>
-            <span>New routes may take several seconds. Cached routes return immediately.</span>
+            <span>Coastal and harbor routes may take several seconds.</span>
           </div>
         </div>
       )}
-      <Menu
+      {!viewerMode && <Menu
+        authSession={authSession}
         activeLayerId={activeLayerId}
         basemapId={basemapId}
         basemaps={BASEMAPS}
@@ -1308,6 +1476,12 @@ export default function App() {
         features={features}
         layers={layers}
         legend={legend}
+        mapDescription={mapDescription}
+        mapId={mapId}
+        mapTitle={mapTitle}
+        mapVisibility={mapVisibility}
+        ownsMap={ownsMap}
+        saveStatus={saveStatus}
         selectedFeatureId={selectedFeatureId}
         selectedFeatureIds={selectedFeatureIds}
         savedView={savedView}
@@ -1332,12 +1506,19 @@ export default function App() {
         onReorderLayer={handleReorderLayer}
         onSaveView={handleSaveView}
         onToggleLayer={handleToggleLayer}
+        onCreateAccount={() => handleSignIn('signup')}
+        onMapDescriptionChange={setMapDescription}
+        onMapTitleChange={setMapTitle}
+        onMapVisibilityChange={setMapVisibility}
+        onSaveMap={handleSaveMap}
+        onSignIn={() => handleSignIn('login')}
+        onSignOut={() => signOut()}
         tutorialExpanded={tutorialStep !== null ? true : undefined}
         tutorialSection={tutorialStep === null
           ? undefined
           : ['map', 'map', 'layers', 'layers', 'data', 'share'][tutorialStep]}
-      />
-      <FeatureEditor
+      />}
+      {!viewerMode && <FeatureEditor
         feature={selectedFeature}
         features={selectedFeatures}
         legend={legend}
@@ -1348,13 +1529,13 @@ export default function App() {
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
         openRequest={featureEditorRequest}
         tutorialExpanded={tutorialStep === 3 ? false : undefined}
-      />
-      <Tutorial
+      />}
+      {!viewerMode && <Tutorial
         step={tutorialStep}
         onBack={() => showTutorialStep(Math.max(0, tutorialStep - 1))}
         onClose={closeTutorial}
         onNext={() => showTutorialStep(Math.min(5, tutorialStep + 1))}
-      />
+      />}
 
       {dragActive && (
         <div className="geojson-drop-overlay" aria-hidden="true">
