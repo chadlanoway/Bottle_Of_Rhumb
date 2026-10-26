@@ -364,6 +364,9 @@ export function previewFeaturePopup(draw, map, id, styleDefaults = {}) {
 }
 
 export function setupViewerFeatureInteractions(draw, map, getStyleDefaults) {
+  // Keep thin routes and small points easy to use without changing their
+  // visible styling. This produces a 28 px square hit target around the mouse.
+  const hitRadius = 14;
   const hitLayerIds = [
     'td-point',
     'td-point-marker',
@@ -384,8 +387,8 @@ export function setupViewerFeatureInteractions(draw, map, getStyleDefaults) {
 
     const rendered = map.queryRenderedFeatures(
       [
-        [point.x - 7, point.y - 7],
-        [point.x + 7, point.y + 7],
+        [point.x - hitRadius, point.y - hitRadius],
+        [point.x + hitRadius, point.y + hitRadius],
       ],
       { layers },
     );
