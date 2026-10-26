@@ -149,6 +149,63 @@ export function searchResultPoint(result) {
   return pointFromResult(result);
 }
 
+export async function requestWaterRoute(apiUrl, start, end, name = 'Water route', signal) {
+  if (!apiUrl) throw new Error('VITE_WATER_ROUTING_API_URL is not configured.');
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({
+      start: { lng: start[0], lat: start[1] },
+      end: { lng: end[0], lat: end[1] },
+      name,
+    }),
+  });
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error('The water-routing service returned an unreadable response.');
+  }
+  if (!response.ok) {
+    throw new Error(payload?.detail || payload?.error || `Water-routing error ${response.status}.`);
+  }
+  if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload.features)) {
+    throw new Error('The water-routing service did not return GeoJSON.');
+  }
+  if (!payload.features.some((feature) => feature?.properties?.featureType === 'water-route')) {
+    throw new Error('The water-routing response did not contain a route.');
+  }
+  return {
+    ...payload,
+    features: payload.features.map((feature) => ({
+      ...feature,
+      geometry: feature?.geometry
+        ? {
+            ...feature.geometry,
+            coordinates: roundGeoJSONCoordinates(feature.geometry.coordinates),
+          }
+        : feature?.geometry,
+    })),
+  };
+}
+
+function roundGeoJSONCoordinates(value) {
+  if (!Array.isArray(value)) return value;
+  if (
+    value.length >= 2
+    && typeof value[0] === 'number'
+    && typeof value[1] === 'number'
+  ) {
+    return value.map((coordinate) => (
+      typeof coordinate === 'number'
+        ? Number(coordinate.toFixed(6))
+        : coordinate
+    ));
+  }
+  return value.map(roundGeoJSONCoordinates);
+}
+
 async function requestApi(apiUrl, body) {
   if (!apiUrl) throw new Error('VITE_LAND_ROUTING_API_URL is not configured.');
   const response = await fetch(apiUrl, {
@@ -162,6 +219,8 @@ async function requestApi(apiUrl, body) {
   } catch {
     throw new Error('The map service returned an unreadable response.');
   }
-  if (!response.ok) throw new Error(payload?.error || `Map service error ${response.status}.`);
+  if (!response.ok) {
+    throw new Error(payload?.error || payload?.detail || `Map service error ${response.status}.`);
+  }
   return payload;
 }

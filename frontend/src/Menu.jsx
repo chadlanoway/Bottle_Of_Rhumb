@@ -9,6 +9,7 @@ const DRAW_ACTIONS = [
   { type: 'text', label: 'Text', icon: 'T' },
   { type: 'circle', label: 'Circle', icon: '○' },
   { type: 'quick-route', label: 'Quick route', icon: '⤳' },
+  { type: 'water-route', label: 'Water autoroute', icon: '≈' },
   { type: 'land-route', label: 'Land route', icon: '⇢' },
 ];
 
@@ -109,6 +110,7 @@ export function EditorToolbar({
   onSetView,
   onStartRouting,
   onStartQuickRoute,
+  onStartWaterRoute,
   onUseSearchAsRouteStart,
   routingActive,
   routingStatus,
@@ -139,6 +141,7 @@ export function EditorToolbar({
   function chooseTool(type) {
     setDrawMenuOpen(false);
     if (type === 'land-route') onStartRouting(routeProfile);
+    else if (type === 'water-route') onStartWaterRoute();
     else if (type === 'quick-route') onStartQuickRoute();
     else onDraw(type);
   }

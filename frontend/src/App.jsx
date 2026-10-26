@@ -33,6 +33,7 @@ import {
   searchAddresses,
   searchResultPoint,
   showSearchResult,
+  requestWaterRoute,
 } from './routing-tools.js';
 import {
   isSupportedPopupImage,
@@ -60,6 +61,7 @@ function makeLayer(id, name, index = 0) {
 
 const DEFAULT_LAYER = makeLayer('default-layer', 'Untitled layer');
 const LAND_ROUTING_API_URL = import.meta.env.VITE_LAND_ROUTING_API_URL ?? '';
+const WATER_ROUTING_API_URL = import.meta.env.VITE_WATER_ROUTING_API_URL ?? '';
 const IMAGE_UPLOAD_API_URL = import.meta.env.VITE_IMAGE_UPLOAD_API_URL ?? '';
 const TUTORIAL_LAYER_ID = 'bottle-of-rhumb-tutorial';
 const TUTORIAL_CENTER = [-87.72, 43.27];
@@ -72,6 +74,8 @@ export default function App() {
   const dragDepthRef = useRef(0);
   const routingControllerRef = useRef(null);
   const quickRouteControllerRef = useRef(null);
+  const waterRouteControllerRef = useRef(null);
+  const waterRouteAbortRef = useRef(null);
   const searchMarkerRef = useRef(null);
   const tutorialFeatureIdsRef = useRef({ points: [], route: [] });
   const photoPlacementCleanupRef = useRef(null);
@@ -90,6 +94,9 @@ export default function App() {
   const [routingStatus, setRoutingStatus] = useState('');
   const [quickRouteActive, setQuickRouteActive] = useState(false);
   const [quickRouteStatus, setQuickRouteStatus] = useState('');
+  const [waterRouteActive, setWaterRouteActive] = useState(false);
+  const [waterRouteStatus, setWaterRouteStatus] = useState('');
+  const [waterRouteLoading, setWaterRouteLoading] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(null);
   const [featureEditorRequest, setFeatureEditorRequest] = useState(null);
   const [legend, setLegend] = useState({
@@ -147,6 +154,8 @@ export default function App() {
     return () => {
       routingControllerRef.current?.destroy();
       quickRouteControllerRef.current?.destroy();
+      waterRouteControllerRef.current?.destroy();
+      waterRouteAbortRef.current?.abort();
       photoPlacementCleanupRef.current?.();
       searchMarkerRef.current?.remove();
 
@@ -183,6 +192,11 @@ export default function App() {
         onActiveChange: setQuickRouteActive,
         onComplete: handleQuickRouteReady,
         onStatus: setQuickRouteStatus,
+      });
+      waterRouteControllerRef.current = createQuickRouteController(map, {
+        onActiveChange: setWaterRouteActive,
+        onComplete: handleWaterRouteReady,
+        onStatus: setWaterRouteStatus,
       });
 
       if (restoredFeatures.length > 0) {
@@ -228,6 +242,7 @@ export default function App() {
     setSelectedFeatureIds([]);
     routingControllerRef.current?.cancel();
     quickRouteControllerRef.current?.cancel();
+    waterRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, type);
   }
@@ -237,6 +252,7 @@ export default function App() {
     photoPlacementCleanupRef.current?.();
     setSelectedFeatureIds([]);
     quickRouteControllerRef.current?.cancel();
+    waterRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, 'select');
     routingControllerRef.current?.arm(profile, presetStart);
@@ -247,9 +263,21 @@ export default function App() {
     photoPlacementCleanupRef.current?.();
     setSelectedFeatureIds([]);
     routingControllerRef.current?.cancel();
+    waterRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, 'select');
     quickRouteControllerRef.current?.arm();
+  }
+
+  function handleStartWaterRoute() {
+    setError('');
+    photoPlacementCleanupRef.current?.();
+    setSelectedFeatureIds([]);
+    routingControllerRef.current?.cancel();
+    quickRouteControllerRef.current?.cancel();
+    mapRef.current?.rhumbWeatherControl?.disableWeather();
+    startDrawing(drawRef.current, 'select');
+    waterRouteControllerRef.current?.arm();
   }
 
   function handleQuickRouteReady(start, end) {
@@ -287,6 +315,134 @@ export default function App() {
     } catch (caughtError) {
       setError(caughtError.message || 'The quick route could not be created.');
     }
+  }
+
+  async function handleWaterRouteReady(start, end) {
+    const abortController = new AbortController();
+    waterRouteAbortRef.current?.abort();
+    waterRouteAbortRef.current = abortController;
+    setWaterRouteLoading(true);
+    setWaterRouteStatus('Calculating water route… New routes may take several seconds.');
+    try {
+      const payload = await requestWaterRoute(
+        WATER_ROUTING_API_URL,
+        start,
+        end,
+        'Water autoroute',
+        abortController.signal,
+      );
+      const supported = [];
+      for (const feature of payload.features) {
+        const isRoute = feature.properties?.featureType === 'water-route';
+        if (isRoute && feature.geometry?.type === 'MultiLineString') {
+          feature.geometry.coordinates.forEach((coordinates, index) => {
+            supported.push({
+              ...feature,
+              id: undefined,
+              properties: {
+                ...feature.properties,
+                name: index === 0
+                  ? feature.properties?.name || 'Water autoroute'
+                  : `${feature.properties?.name || 'Water autoroute'} ${index + 1}`,
+                waterRouteSegment: index + 1,
+              },
+              geometry: { type: 'LineString', coordinates },
+            });
+          });
+        } else {
+          supported.push({ ...feature, id: undefined });
+        }
+      }
+
+      const collection = {
+        type: 'FeatureCollection',
+        features: supported.map((feature) => {
+          const featureType = feature.properties?.featureType;
+          const isRoute = featureType === 'water-route';
+          return {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              name: feature.properties?.name || (isRoute ? 'Water autoroute' : 'Route point'),
+              routeRole: isRoute
+                ? 'route'
+                : featureType === 'route-start' ? 'start' : 'destination',
+              routeDistanceKilometers: isRoute
+                ? feature.properties?.distance_kilometers ?? null
+                : null,
+              source: 'bottle-of-rhumb-water-routing',
+              ...(isRoute ? {
+                featureColor: feature.properties?.requiresManualAdjustment
+                  ? '#e09a3e'
+                  : '#1e90ff',
+                featureSize: 3,
+                featureDash: feature.properties?.requiresManualAdjustment
+                  ? 'dashed'
+                  : 'solid',
+              } : {}),
+            },
+          };
+        }),
+      };
+
+      const added = addDerivedGeoJSON(
+        drawRef.current,
+        collection,
+        activeLayerIdRef.current,
+      );
+      setFeatures(added.collection.features);
+      const routeIndex = collection.features.findIndex(
+        (feature) => feature.properties?.routeRole === 'route',
+      );
+      const routeId = added.addedIds[routeIndex];
+      if (routeId !== undefined) {
+        startDrawing(drawRef.current, 'select');
+        selectFeature(drawRef.current, routeId);
+        setSelectedFeatureIds([routeId]);
+      }
+
+      const route = collection.features[routeIndex];
+      const kilometers = route?.properties?.distance_kilometers;
+      const cached = route?.properties?.cache_hit === true;
+      const manualSegments = route?.properties?.manualAdjustmentSegments ?? [];
+      const requiresAdjustment = route?.properties?.requiresManualAdjustment === true;
+      if (requiresAdjustment) {
+        const segmentLabel = manualSegments.length > 0
+          ? manualSegments.join(' and ')
+          : 'highlighted';
+        setWaterRouteStatus(
+          `Route added, but the ${segmentLabel} harbor approach could not be calculated automatically. The route is selected—drag its vertices or midpoint handles around land before use.`,
+        );
+      } else {
+        setWaterRouteStatus(
+          `Water route added${Number.isFinite(kilometers) ? ` (${kilometers.toLocaleString()} km)` : ''}${cached ? ' from cache' : ''}. Drag its vertices to adjust it.`,
+        );
+      }
+      window.setTimeout(() => setWaterRouteStatus(''), requiresAdjustment ? 15000 : 9000);
+    } catch (caughtError) {
+      if (caughtError.name === 'AbortError') {
+        setWaterRouteStatus('Water route cancelled.');
+        return;
+      }
+      const message = caughtError.message || 'The water route could not be created.';
+      setError(message);
+      setWaterRouteStatus(message);
+    } finally {
+      if (waterRouteAbortRef.current === abortController) {
+        waterRouteAbortRef.current = null;
+        setWaterRouteLoading(false);
+      }
+    }
+  }
+
+  function handleCancelRouting() {
+    routingControllerRef.current?.cancel();
+    quickRouteControllerRef.current?.cancel();
+    waterRouteControllerRef.current?.cancel();
+    waterRouteAbortRef.current?.abort();
+    waterRouteAbortRef.current = null;
+    setWaterRouteLoading(false);
+    setWaterRouteStatus('');
   }
 
   async function handleRouteReady(payload, profile) {
@@ -513,6 +669,7 @@ export default function App() {
     photoPlacementCleanupRef.current?.();
     routingControllerRef.current?.cancel();
     quickRouteControllerRef.current?.cancel();
+    waterRouteControllerRef.current?.cancel();
     startDrawing(drawRef.current, 'select');
 
     const canvas = map.getCanvas();
@@ -895,6 +1052,12 @@ export default function App() {
     setMapReady(false);
     routingControllerRef.current?.destroy();
     routingControllerRef.current = null;
+    quickRouteControllerRef.current?.destroy();
+    quickRouteControllerRef.current = null;
+    waterRouteControllerRef.current?.destroy();
+    waterRouteControllerRef.current = null;
+    waterRouteAbortRef.current?.abort();
+    waterRouteAbortRef.current = null;
     searchMarkerRef.current?.remove();
     searchMarkerRef.current = null;
     mapRef.current.rhumbWeatherControl?.disableWeather();
@@ -1115,20 +1278,27 @@ export default function App() {
         onAddSearchPoint={handleAddSearchPoint}
         onAddressSearch={handleAddressSearch}
         onLocateDevice={handleLocateDevice}
-        onCancelRouting={() => {
-          routingControllerRef.current?.cancel();
-          quickRouteControllerRef.current?.cancel();
-        }}
+        onCancelRouting={handleCancelRouting}
         onPreviewSearchResult={handlePreviewSearchResult}
         onSetView={handleSaveView}
         onStartRouting={handleStartRouting}
         onStartQuickRoute={handleStartQuickRoute}
+        onStartWaterRoute={handleStartWaterRoute}
         onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
-        routingActive={routingActive || quickRouteActive}
-        routingStatus={quickRouteStatus || routingStatus}
+        routingActive={routingActive || quickRouteActive || waterRouteActive || waterRouteLoading}
+        routingStatus={waterRouteStatus || quickRouteStatus || routingStatus}
         viewSaved={Boolean(savedView)}
         tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
       />
+      {waterRouteLoading && (
+        <div className="water-route-loading" role="status" aria-live="polite">
+          <span className="water-route-spinner" aria-hidden="true" />
+          <div>
+            <strong>Calculating water route…</strong>
+            <span>New routes may take several seconds. Cached routes return immediately.</span>
+          </div>
+        </div>
+      )}
       <Menu
         activeLayerId={activeLayerId}
         basemapId={basemapId}

@@ -358,6 +358,52 @@ select:focus-visible {
   font-size: 13px;
 }
 
+.water-route-loading {
+  position: absolute;
+  z-index: 95;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  min-width: min(390px, calc(100vw - 32px));
+  align-items: center;
+  gap: 13px;
+  transform: translate(-50%, -50%);
+  padding: 16px 18px;
+  border: 1px solid rgba(139, 174, 186, .75);
+  border-radius: 10px;
+  background: rgba(23, 34, 41, .96);
+  color: white;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .34);
+}
+
+.water-route-loading div {
+  display: grid;
+  gap: 3px;
+}
+
+.water-route-loading span:not(.water-route-spinner) {
+  color: #c7d6dc;
+  font-size: 12px;
+}
+
+.water-route-spinner {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 auto;
+  border: 3px solid rgba(255, 255, 255, .25);
+  border-top-color: #55b6d0;
+  border-radius: 50%;
+  animation: water-route-spin .85s linear infinite;
+}
+
+@keyframes water-route-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .water-route-spinner { animation: none; }
+}
+
 .route-endpoint-marker,
 .search-result-marker {
   display: grid;

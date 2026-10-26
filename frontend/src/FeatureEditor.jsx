@@ -216,7 +216,14 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
         )}
 
         {!multiple && activeTab === 'popup' && (
-          <PopupControls feature={feature} legend={legend} onImageUpload={onImageUpload} onPreview={onPreview} onUpdate={onUpdate} />
+          <PopupControls
+            feature={feature}
+            legend={legend}
+            onCollapse={() => setCollapsed(true)}
+            onImageUpload={onImageUpload}
+            onPreview={onPreview}
+            onUpdate={onUpdate}
+          />
         )}
 
         {activeTab === 'geometry' && (
@@ -372,7 +379,7 @@ function GeometryControls({ feature, selectionCount, onRun }) {
   );
 }
 
-function PopupControls({ feature, legend, onImageUpload, onPreview, onUpdate }) {
+function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, onUpdate }) {
   const properties = feature.properties ?? {};
   const enabled = properties.popupEnabled === true;
   const backgroundColor = properties.popupBackgroundColor ?? legend?.backgroundColor ?? '#172229';
@@ -611,7 +618,14 @@ function PopupControls({ feature, legend, onImageUpload, onPreview, onUpdate }) 
             </div>
           )}
 
-          <button className="preview-popup-button" type="button" onClick={onPreview}>
+          <button
+            className="preview-popup-button"
+            type="button"
+            onClick={() => {
+              onPreview();
+                onCollapse();
+            }}
+          >
             Preview popup
           </button>
         </>
