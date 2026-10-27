@@ -13,6 +13,7 @@ const LIVE_SEGMENT_CASING = 'bottle-of-rhumb-live-segment-casing';
 const LIVE_SEGMENT_LINE = 'bottle-of-rhumb-live-segment-line';
 const EARTH_RADIUS_METERS = 6371008.8;
 const liveDrawingOverlays = new WeakMap();
+const drawingInstructionOverlays = new WeakMap();
 const TEXT_SOURCE = 'bottle-of-rhumb-text';
 const FEATURE_LABEL_LAYER = 'bottle-of-rhumb-feature-labels';
 const FREE_TEXT_LAYER = 'bottle-of-rhumb-free-text';
@@ -274,6 +275,10 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
     const liveOverlay = setupLiveDrawingOverlay(map, engine);
     liveDrawingOverlays.set(draw, liveOverlay);
     engine.on('finish', liveOverlay.clear);
+
+    const instructionOverlay = setupDrawingInstructionOverlay(map, engine);
+    drawingInstructionOverlays.set(draw, instructionOverlay);
+    engine.on('finish', instructionOverlay.clear);
   }
 
   map.on('click', FREE_TEXT_LAYER, (event) => {
@@ -306,10 +311,89 @@ export function startDrawing(draw, geometryType) {
 
   const engine = draw.getTerraDrawInstance();
   liveDrawingOverlays.get(draw)?.clear();
+  drawingInstructionOverlays.get(draw)?.clear();
 
   const mode = modes[geometryType];
   if (!mode) throw new Error(`Unknown drawing type: ${geometryType}`);
   engine?.setMode(mode);
+}
+
+function setupDrawingInstructionOverlay(map, engine) {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'drawing-instruction-tooltip';
+  tooltip.setAttribute('role', 'status');
+  Object.assign(tooltip.style, {
+    position: 'absolute',
+    zIndex: '30',
+    display: 'none',
+    maxWidth: '290px',
+    padding: '7px 10px',
+    border: '1px solid rgba(255,255,255,.22)',
+    borderRadius: '999px',
+    background: '#172229',
+    color: '#fff',
+    boxShadow: '0 5px 18px rgba(0,0,0,.28)',
+    font: '600 12px/1.25 Arial, Helvetica, sans-serif',
+    pointerEvents: 'none',
+    transform: 'translate(14px, 14px)',
+    whiteSpace: 'nowrap',
+  });
+  map.getContainer().appendChild(tooltip);
+
+  const clear = () => {
+    tooltip.style.display = 'none';
+  };
+
+  const getInstruction = () => {
+    const mode = engine.getMode();
+    const snapshot = engine.getSnapshot();
+    const drawingFeature = snapshot.find(
+      (feature) =>
+        feature.properties?.mode === mode &&
+        feature.properties?.currentlyDrawing === true,
+    );
+
+    if (mode === 'point') return 'Click the map to place a point';
+    if (mode === 'text') return 'Click the map to place text';
+    if (mode === 'circle') return 'Click once, then move mouse to draw a circle';
+
+    if (mode === 'linestring') {
+      return drawingFeature
+        ? 'Click to add a vertex · Double-click to finish'
+        : 'Click the map to start a line';
+    }
+
+    if (mode === 'polygon') {
+      return drawingFeature
+        ? 'Click to add a vertex · Double-click to finish'
+        : 'Click the map to start a polygon';
+    }
+
+    return '';
+  };
+
+  const update = (event) => {
+    const message = getInstruction();
+    if (!message) {
+      clear();
+      return;
+    }
+
+    tooltip.textContent = message;
+    tooltip.style.left = `${event.point.x}px`;
+    tooltip.style.top = `${event.point.y}px`;
+    tooltip.style.display = 'block';
+  };
+
+  map.on('mousemove', update);
+  map.on('mouseout', clear);
+  map.once('remove', () => {
+    map.off('mousemove', update);
+    map.off('mouseout', clear);
+    tooltip.remove();
+  });
+
+  return { clear };
 }
 
 export function deleteSelected(draw) {
@@ -542,7 +626,7 @@ function pointInScreenRing(point, ring) {
     const second = ring[previous];
     const crosses = ((first.y > point.y) !== (second.y > point.y))
       && point.x < ((second.x - first.x) * (point.y - first.y))
-        / ((second.y - first.y) || Number.EPSILON) + first.x;
+      / ((second.y - first.y) || Number.EPSILON) + first.x;
     if (crosses) inside = !inside;
   }
   return inside;

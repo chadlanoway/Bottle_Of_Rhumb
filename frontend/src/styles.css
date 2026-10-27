@@ -1873,6 +1873,72 @@ button:disabled {
   filter: invert(.85);
 }
 
+.basemap-preview.is-fiord>span {
+  background:
+    linear-gradient(28deg, transparent 42%, rgba(179, 215, 222, .75) 43% 49%, transparent 50%),
+    linear-gradient(145deg, transparent 38%, rgba(119, 170, 181, .42) 39% 44%, transparent 45%),
+    #183540;
+}
+
+.basemap-preview.is-hiking>span {
+  background:
+    repeating-radial-gradient(ellipse at 75% 30%, transparent 0 4px, rgba(89, 109, 73, .28) 5px 6px),
+    linear-gradient(145deg, #7f9a6d 0 36%, #d8c797 37% 64%, #718b61 65%);
+}
+
+.basemap-preview.is-nautical>span {
+  background:
+    radial-gradient(circle at 72% 35%, #e0504d 0 2px, transparent 3px),
+    linear-gradient(28deg, transparent 42%, rgba(255, 255, 255, .9) 43% 49%, transparent 50%),
+    #76b9d6;
+}
+
+.basemap-preview.is-cycling>span {
+  background:
+    linear-gradient(30deg, transparent 43%, #d23c3c 44% 48%, transparent 49%),
+    linear-gradient(145deg, transparent 39%, rgba(57, 91, 63, .4) 40% 44%, transparent 45%),
+    #b7d7a9;
+}
+
+.basemap-preview.is-winter>span {
+  background:
+    linear-gradient(30deg, transparent 43%, rgba(73, 142, 196, .85) 44% 48%, transparent 49%),
+    radial-gradient(ellipse at 70% 25%, transparent 0 5px, rgba(116, 150, 176, .32) 6px 7px),
+    #e8f2f7;
+}
+
+.basemap-preview.is-seafloor>span {
+  background:
+    repeating-radial-gradient(ellipse at 25% 80%, rgba(255, 255, 255, .2) 0 4px, rgba(24, 113, 155, .3) 5px 6px),
+    linear-gradient(#a9d8e8, #277ea8);
+}
+
+.basemap-preview.is-americana>span {
+  background:
+    linear-gradient(28deg, transparent 42%, #d85145 43% 48%, transparent 49%),
+    linear-gradient(145deg, transparent 38%, #f2c84b 39% 44%, transparent 45%),
+    #e9dcc0;
+}
+
+.basemap-preview.is-three-d>span {
+  background:
+    linear-gradient(135deg, transparent 36%, rgba(74, 82, 89, .78) 37% 51%, transparent 52%),
+    linear-gradient(45deg, transparent 48%, rgba(130, 138, 143, .68) 49% 62%, transparent 63%),
+    #c9d5df;
+}
+
+.maptoolkit-logo-control {
+  display: block;
+  height: 24px;
+  margin: 0 0 6px 6px;
+}
+
+.maptoolkit-logo-control img {
+  display: block;
+  width: auto;
+  height: 100%;
+}
+
 .basemap-preview:hover:not(:disabled),
 .basemap-preview.is-selected {
   border-color: var(--blue);

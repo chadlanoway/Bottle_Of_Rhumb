@@ -32,7 +32,57 @@ export const BASEMAPS = [
     description: 'Dark background for bright overlays.',
     style: 'https://tiles.openfreemap.org/styles/dark',
   },
+  {
+    id: 'fiord',
+    name: 'Fiord',
+    description: 'Cool, dark-blue background suited to marine maps.',
+    style: 'https://tiles.openfreemap.org/styles/fiord',
+  },
+  {
+    id: 'hiking',
+    name: 'Hiking',
+    description: 'Trails, route shields, contours and terrain shading.',
+    style: 'https://styles.maptoolkit.org/hiking.json',
+  },
+  {
+    id: 'nautical',
+    name: 'Nautical',
+    description: 'Seamarks, hazards, bathymetry and marine infrastructure.',
+    style: 'https://tiles.openwaters.io/seamap/style.json',
+  },
+  {
+    id: 'cycling',
+    name: 'Cycling',
+    description: 'Cycle routes, paths, contours and terrain shading.',
+    style: 'https://styles.maptoolkit.org/cycling.json',
+  },
+  {
+    id: 'winter',
+    name: 'Winter',
+    description: 'Ski trails, lifts and winter recreation features.',
+    style: 'https://styles.maptoolkit.org/winter.json',
+  },
+  {
+    id: 'seafloor',
+    name: 'Seafloor',
+    description: 'Depth shading, contours and soundings shown in feet.',
+    style: 'https://tiles.openwaters.io/seascape/style.json?unit=ft&safety=2',
+  },
+  {
+    id: 'americana',
+    name: 'Americana',
+    description: 'US road-atlas styling with highway and route shields.',
+    style: 'https://americanamap.org/style.json',
+  },
+  {
+    id: 'three-d',
+    name: '3D',
+    description: 'OpenFreeMap streets with extruded buildings.',
+    style: 'https://tiles.openfreemap.org/styles/3d',
+  },
 ];
+
+const MAPTOOLKIT_BASEMAP_IDS = new Set(['hiking', 'cycling', 'winter']);
 
 export function createMap(container, basemapId = 'positron', options = {}) {
   const map = new maplibregl.Map({
@@ -40,8 +90,12 @@ export function createMap(container, basemapId = 'positron', options = {}) {
     style: getBasemap(basemapId).style,
     center: [3, 60],
     zoom: 3.5,
-    attributionControl: true,
+    attributionControl: MAPTOOLKIT_BASEMAP_IDS.has(basemapId) ? { compact: false } : true,
   });
+
+  if (MAPTOOLKIT_BASEMAP_IDS.has(basemapId)) {
+    map.addControl(new MaptoolkitLogoControl(), 'bottom-left');
+  }
 
   const projection = options.projection === 'globe' ? 'globe' : 'mercator';
   if (projection === 'globe') {
@@ -120,6 +174,30 @@ export function fitMapToFeatures(map, features, onComplete) {
 
 function getBasemap(id) {
   return BASEMAPS.find((basemap) => basemap.id === id) ?? BASEMAPS[0];
+}
+
+class MaptoolkitLogoControl {
+  onAdd() {
+    const link = document.createElement('a');
+    link.className = 'maptoolkit-logo-control';
+    link.href = 'https://www.maptoolkit.org/';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.title = 'Maptoolkit';
+
+    const image = document.createElement('img');
+    image.src = 'https://www.maptoolkit.org/assets/maptoolkit-attribution.png';
+    image.alt = 'Maptoolkit';
+    link.appendChild(image);
+
+    this.container = link;
+    return link;
+  }
+
+  onRemove() {
+    this.container?.remove();
+    this.container = null;
+  }
 }
 
 function collectCoordinates(value, result) {
