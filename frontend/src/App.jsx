@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Menu, { AppHeader, EditorToolbar } from './Menu.jsx';
 import FeatureEditor from './FeatureEditor.jsx';
 import Tutorial from './Tutorial.jsx';
+import DrawingContextMenu from './DrawingContextMenu.jsx';
 import {
   BASEMAPS,
   createMap,
@@ -107,6 +108,7 @@ export default function App() {
   const [waterRouteLoading, setWaterRouteLoading] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(null);
   const [featureEditorRequest, setFeatureEditorRequest] = useState(null);
+  const [drawingContextMenu, setDrawingContextMenu] = useState(null);
   const [authSession, setAuthSession] = useState(null);
   const [mapId, setMapId] = useState(null);
   const [mapRevision, setMapRevision] = useState(0);
@@ -368,6 +370,20 @@ export default function App() {
     waterRouteControllerRef.current?.cancel();
     mapRef.current?.rhumbWeatherControl?.disableWeather();
     startDrawing(drawRef.current, type);
+  }
+
+  function handleMapContextMenu(event) {
+    if (viewerMode || !mapContainerRef.current?.contains(event.target)) return;
+    event.preventDefault();
+    setDrawingContextMenu({ x: event.clientX, y: event.clientY });
+  }
+
+  function handleContextTool(type) {
+    setDrawingContextMenu(null);
+    if (type === 'quick-route') handleStartQuickRoute();
+    else if (type === 'water-route') handleStartWaterRoute();
+    else if (type === 'land-route') handleStartRouting('foot-walking');
+    else handleDraw(type);
   }
 
   function handleStartRouting(profile, presetStart = null) {
@@ -1494,9 +1510,18 @@ export default function App() {
       onDragLeave={viewerMode ? undefined : handleDragLeave}
       onDragOver={viewerMode ? undefined : handleDragOver}
       onDrop={viewerMode ? undefined : handleDrop}
+      onContextMenu={viewerMode ? undefined : handleMapContextMenu}
     >
       <div ref={mapContainerRef} className="map-canvas" />
       <MapLegend legend={legend} layers={layers} features={features} />
+      {!viewerMode && drawingContextMenu && (
+        <DrawingContextMenu
+          activeLayerName={activeLayer?.name}
+          position={drawingContextMenu}
+          onChoose={handleContextTool}
+          onClose={() => setDrawingContextMenu(null)}
+        />
+      )}
       {!viewerMode && (
         <>
           <AppHeader

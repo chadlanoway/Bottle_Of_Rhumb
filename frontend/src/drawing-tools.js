@@ -245,6 +245,13 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
     }
     onSelectionChange?.(id, { additive: false });
     reportChange();
+    queueMicrotask(() => {
+      if (!engine || engine.getMode() === 'select') return;
+      engine.setMode('select');
+      if (id !== null && id !== undefined) {
+        try { engine.selectFeature(id); } catch { /* feature remains created */ }
+      }
+    });
   });
   engine?.on('change', reportChange);
   engine?.on('select', (id) => {
