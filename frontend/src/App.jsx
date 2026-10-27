@@ -33,7 +33,6 @@ import {
   createLandRoutingController,
   searchAddresses,
   searchResultPoint,
-  showSearchResult,
   requestWaterRoute,
 } from './routing-tools.js';
 import {
@@ -599,11 +598,14 @@ export default function App() {
   }
 
   function handlePreviewSearchResult(result) {
-    searchMarkerRef.current = showSearchResult(
-      mapRef.current,
-      result,
-      searchMarkerRef.current,
-    );
+    const point = searchResultPoint(result);
+    searchMarkerRef.current?.remove();
+    searchMarkerRef.current = null;
+    mapRef.current?.flyTo({
+      center: [point.lng, point.lat],
+      zoom: Math.max(mapRef.current.getZoom(), 15),
+      duration: 800,
+    });
   }
 
   function handleAddSearchPoint(result) {
