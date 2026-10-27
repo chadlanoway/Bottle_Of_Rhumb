@@ -42,6 +42,14 @@ export async function updateMap(mapId, map, accessToken) {
   return response.payload.map;
 }
 
+export async function deleteMap(mapId, accessToken) {
+  requireToken(accessToken);
+  await request(`/maps/${encodeURIComponent(mapId)}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${MAPS_API_URL}${path}`, {
     method: options.method || 'GET',

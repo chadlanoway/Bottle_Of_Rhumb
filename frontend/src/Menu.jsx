@@ -351,6 +351,7 @@ export default function Menu({
   onMapDescriptionChange,
   onMapTitleChange,
   onMapVisibilityChange,
+  onDeleteSavedMap,
   onOpenSavedMap,
   onSaveMap,
   onSignIn,
@@ -472,6 +473,7 @@ export default function Menu({
               onMapDescriptionChange={onMapDescriptionChange}
               onMapTitleChange={onMapTitleChange}
               onMapVisibilityChange={onMapVisibilityChange}
+              onDeleteSavedMap={onDeleteSavedMap}
               onOpenSavedMap={onOpenSavedMap}
               onSaveMap={onSaveMap}
               onSignIn={onSignIn}
@@ -499,6 +501,7 @@ function ShareSection({
   onMapDescriptionChange,
   onMapTitleChange,
   onMapVisibilityChange,
+  onDeleteSavedMap,
   onOpenSavedMap,
   onSaveMap,
   onSignIn,
@@ -544,18 +547,31 @@ function ShareSection({
             {myMaps.length > 0 && (
               <div className="my-maps-list">
                 {myMaps.map((savedMap) => (
-                  <button
-                    className={String(savedMap.mapId) === String(mapId) ? 'is-current' : ''}
+                  <div
+                    className={`my-map-row ${String(savedMap.mapId) === String(mapId) ? 'is-current' : ''}`}
                     key={savedMap.mapId}
-                    type="button"
-                    onClick={() => onOpenSavedMap(savedMap.mapId)}
                   >
-                    <span>
-                      <strong>{savedMap.title || 'Untitled map'}</strong>
-                      <small>{formatSavedMapDate(savedMap.updatedAt)}</small>
-                    </span>
-                    <em>{savedMap.visibility === 'published' ? 'Published' : 'Draft'}</em>
-                  </button>
+                    <button
+                      className="my-map-open-button"
+                      type="button"
+                      onClick={() => onOpenSavedMap(savedMap.mapId)}
+                    >
+                      <span>
+                        <strong>{savedMap.title || 'Untitled map'}</strong>
+                        <small>{formatSavedMapDate(savedMap.updatedAt)}</small>
+                      </span>
+                      <em>{savedMap.visibility === 'published' ? 'Published' : 'Draft'}</em>
+                    </button>
+                    <button
+                      className="my-map-delete-button"
+                      type="button"
+                      title={`Delete ${savedMap.title || 'Untitled map'}`}
+                      aria-label={`Delete ${savedMap.title || 'Untitled map'}`}
+                      onClick={() => onDeleteSavedMap(savedMap)}
+                    >
+                      🗑
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

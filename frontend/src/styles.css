@@ -2858,25 +2858,50 @@ button:disabled {
   overflow-y: auto;
 }
 
-.my-maps-list > button {
+.my-map-row {
   display: flex;
   width: 100%;
+  align-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .055);
+  overflow: hidden;
+}
+
+.my-map-open-button {
+  display: flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
   justify-content: space-between;
   gap: 9px;
   padding: 8px 9px;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, .055);
+  border: 0;
+  background: transparent;
   color: white;
   cursor: pointer;
   text-align: left;
 }
 
-.my-maps-list > button:hover,
-.my-maps-list > button.is-current {
+.my-map-row:hover,
+.my-map-row.is-current {
   border-color: var(--blue);
   background: rgba(30, 144, 255, .14);
+}
+
+.my-map-delete-button {
+  align-self: stretch;
+  flex: 0 0 36px;
+  border: 0;
+  border-left: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, .12);
+  color: #ffb3b3;
+  cursor: pointer;
+}
+
+.my-map-delete-button:hover {
+  background: rgba(205, 60, 60, .28);
+  color: white;
 }
 
 .my-maps-list span {
@@ -2900,6 +2925,53 @@ button:disabled {
 
 .my-maps-list em {
   flex: 0 0 auto;
+}
+
+.popup-youtube-controls {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.popup-youtube-controls .field-label {
+  margin: 0;
+}
+
+.popup-youtube-controls > input {
+  width: 100%;
+}
+
+.popup-youtube-controls small {
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+.popup-youtube-error {
+  margin: 0;
+  color: #ffb3b3;
+  font-size: .75rem;
+}
+
+.feature-popup-youtube {
+  position: relative;
+  width: 100%;
+  margin: 8px 0;
+  padding-top: 56.25%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #000;
+}
+
+.feature-popup-youtube iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .share-section > input,

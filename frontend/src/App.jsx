@@ -48,6 +48,7 @@ import {
 import { initializeAuth, signIn, signOut } from './auth.js';
 import {
   createMap as createSavedMap,
+  deleteMap as deleteSavedMap,
   listMaps as listSavedMaps,
   loadMap as loadSavedMap,
   updateMap as updateSavedMap,
@@ -1288,6 +1289,27 @@ export default function App() {
     window.location.assign(url.toString());
   }
 
+  async function handleDeleteSavedMap(savedMap) {
+    if (!authSession?.accessToken || !savedMap?.mapId) return;
+    const title = savedMap.title || 'Untitled map';
+    if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return;
+
+    setMyMapsStatus('Deleting map…');
+    try {
+      await deleteSavedMap(savedMap.mapId, authSession.accessToken);
+      if (String(savedMap.mapId) === String(mapId)) {
+        window.location.assign(new URL(import.meta.env.BASE_URL, window.location.origin).toString());
+        return;
+      }
+      setMyMaps((current) => current.filter(
+        (candidate) => String(candidate.mapId) !== String(savedMap.mapId),
+      ));
+      setMyMapsStatus('Map deleted.');
+    } catch (caughtError) {
+      setMyMapsStatus(caughtError.message || 'The map could not be deleted.');
+    }
+  }
+
   async function handleSignIn(mode = 'login') {
     try {
       await signIn(mode);
@@ -1558,6 +1580,7 @@ export default function App() {
         onMapDescriptionChange={setMapDescription}
         onMapTitleChange={setMapTitle}
         onMapVisibilityChange={setMapVisibility}
+        onDeleteSavedMap={handleDeleteSavedMap}
         onOpenSavedMap={handleOpenSavedMap}
         onSaveMap={handleSaveMap}
         onSignIn={() => handleSignIn('login')}

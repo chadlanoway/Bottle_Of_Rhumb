@@ -32,6 +32,7 @@ const RESERVED_PROPERTIES = new Set([
   'popupImageKey',
   'popupImageAlt',
   'popupImageCaption',
+  'popupYouTubeUrl',
   'popupBackgroundColor',
   'popupBackgroundOpacity',
   'popupTextColor',
@@ -515,6 +516,23 @@ function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, 
             {uploadMessage && <p className="popup-image-message" role="status">{uploadMessage}</p>}
           </div>
 
+          <div className="popup-youtube-controls">
+            <label className="field-label" htmlFor="popup-youtube-url">YouTube video</label>
+            <input
+              id="popup-youtube-url"
+              type="url"
+              value={properties.popupYouTubeUrl ?? ''}
+              placeholder="https://www.youtube.com/watch?v=…"
+              onChange={(event) => onUpdate({ popupYouTubeUrl: event.target.value })}
+            />
+            <small>
+              Paste a YouTube, YouTube Shorts, or youtu.be link. Autoplay is disabled.
+            </small>
+            {properties.popupYouTubeUrl && !isYouTubeUrl(properties.popupYouTubeUrl) && (
+              <p className="popup-youtube-error" role="status">Enter a valid YouTube video URL.</p>
+            )}
+          </div>
+
           <fieldset className="popup-appearance-fieldset">
             <legend>Appearance</legend>
             
@@ -632,6 +650,21 @@ function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, 
       )}
     </div>
   );
+}
+
+function isYouTubeUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    if (host === 'youtu.be') return /^[A-Za-z0-9_-]{6,20}$/.test(url.pathname.split('/').filter(Boolean)[0] || '');
+    if (!['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) return false;
+    const id = url.pathname === '/watch'
+      ? url.searchParams.get('v')
+      : url.pathname.match(/^\/(?:shorts|embed)\/([^/?]+)/)?.[1];
+    return /^[A-Za-z0-9_-]{6,20}$/.test(id || '');
+  } catch {
+    return false;
+  }
 }
 
 function TextControls({ feature, isTextFeature, onUpdate }) {

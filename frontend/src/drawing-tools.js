@@ -1063,6 +1063,21 @@ function buildPopupElement(properties) {
     container.appendChild(figure);
   }
 
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(properties.popupYouTubeUrl);
+  if (youtubeEmbedUrl) {
+    const video = document.createElement('div');
+    video.className = 'feature-popup-youtube';
+    const iframe = document.createElement('iframe');
+    iframe.src = youtubeEmbedUrl;
+    iframe.title = title ? `${title} video` : 'YouTube video';
+    iframe.loading = 'lazy';
+    iframe.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    video.appendChild(iframe);
+    container.appendChild(video);
+  }
+
   if (description) {
     const paragraph = document.createElement('p');
     paragraph.textContent = description;
@@ -1086,6 +1101,26 @@ function buildPopupElement(properties) {
   }
 
   return container;
+}
+
+function getYouTubeEmbedUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase().replace(/^www\./, '');
+    let videoId = null;
+    if (host === 'youtu.be') {
+      videoId = url.pathname.split('/').filter(Boolean)[0] || null;
+    } else if (['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) {
+      videoId = url.pathname === '/watch'
+        ? url.searchParams.get('v')
+        : url.pathname.match(/^\/(?:shorts|embed)\/([^/?]+)/)?.[1] || null;
+    }
+    if (!/^[A-Za-z0-9_-]{6,20}$/.test(videoId || '')) return null;
+    return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  } catch {
+    return null;
+  }
 }
 
 function applyPopupStyle(popup, properties, defaults) {
