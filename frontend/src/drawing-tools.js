@@ -403,6 +403,24 @@ export function setupViewerFeatureInteractions(draw, map, getStyleDefaults) {
       if (feature?.properties?.popupEnabled) return feature;
     }
 
+    // Some restored Terra Draw features do not preserve the rendered source
+    // ID in the form returned by queryRenderedFeatures. Fall back to a direct
+    // screen-pixel geometry test so saved points and thin lines remain easy to
+    // click and still receive the pointer cursor.
+    if (rendered.length > 0) {
+      let closest = null;
+      let closestDistance = Infinity;
+      for (const feature of snapshot) {
+        if (!feature?.properties?.popupEnabled) continue;
+        const distance = featureScreenDistance(map, feature, point);
+        if (distance < closestDistance) {
+          closest = feature;
+          closestDistance = distance;
+        }
+      }
+      if (closest && closestDistance <= hitRadius) return closest;
+    }
+
     return null;
   };
 
@@ -430,6 +448,114 @@ export function setupViewerFeatureInteractions(draw, map, getStyleDefaults) {
   };
   map.once('remove', destroy);
   return destroy;
+}
+
+function featureScreenDistance(map, feature, point) {
+  const geometry = feature?.geometry;
+  if (!geometry) return Infinity;
+
+  if (geometry.type === 'Point') {
+    return screenPointDistance(point, projectCoordinate(map, geometry.coordinates));
+  }
+  if (geometry.type === 'MultiPoint') {
+    return minimumDistance(geometry.coordinates, (coordinate) => (
+      screenPointDistance(point, projectCoordinate(map, coordinate))
+    ));
+  }
+  if (geometry.type === 'LineString') {
+    return screenLineDistance(map, point, geometry.coordinates);
+  }
+  if (geometry.type === 'MultiLineString') {
+    return minimumDistance(geometry.coordinates, (line) => (
+      screenLineDistance(map, point, line)
+    ));
+  }
+  if (geometry.type === 'Polygon') {
+    return screenPolygonDistance(map, point, geometry.coordinates);
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return minimumDistance(geometry.coordinates, (polygon) => (
+      screenPolygonDistance(map, point, polygon)
+    ));
+  }
+  return Infinity;
+}
+
+function screenPolygonDistance(map, point, rings) {
+  if (!Array.isArray(rings) || rings.length === 0) return Infinity;
+  const projectedRings = rings.map((ring) => (
+    ring.map((coordinate) => projectCoordinate(map, coordinate)).filter(Boolean)
+  ));
+  if (projectedRings[0]?.length >= 3 && pointInScreenRing(point, projectedRings[0])) {
+    const insideHole = projectedRings.slice(1).some(
+      (ring) => ring.length >= 3 && pointInScreenRing(point, ring),
+    );
+    if (!insideHole) return 0;
+  }
+  return minimumDistance(projectedRings, (ring) => screenPathDistance(point, ring));
+}
+
+function screenLineDistance(map, point, coordinates) {
+  const projected = (coordinates ?? [])
+    .map((coordinate) => projectCoordinate(map, coordinate))
+    .filter(Boolean);
+  return screenPathDistance(point, projected);
+}
+
+function screenPathDistance(point, path) {
+  if (path.length === 1) return screenPointDistance(point, path[0]);
+  let distance = Infinity;
+  for (let index = 1; index < path.length; index += 1) {
+    distance = Math.min(
+      distance,
+      pointToScreenSegmentDistance(point, path[index - 1], path[index]),
+    );
+  }
+  return distance;
+}
+
+function pointToScreenSegmentDistance(point, start, end) {
+  const deltaX = end.x - start.x;
+  const deltaY = end.y - start.y;
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+  if (lengthSquared === 0) return screenPointDistance(point, start);
+  const amount = Math.max(0, Math.min(1, (
+    ((point.x - start.x) * deltaX + (point.y - start.y) * deltaY) / lengthSquared
+  )));
+  return screenPointDistance(point, {
+    x: start.x + amount * deltaX,
+    y: start.y + amount * deltaY,
+  });
+}
+
+function pointInScreenRing(point, ring) {
+  let inside = false;
+  for (let current = 0, previous = ring.length - 1; current < ring.length; previous = current, current += 1) {
+    const first = ring[current];
+    const second = ring[previous];
+    const crosses = ((first.y > point.y) !== (second.y > point.y))
+      && point.x < ((second.x - first.x) * (point.y - first.y))
+        / ((second.y - first.y) || Number.EPSILON) + first.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function projectCoordinate(map, coordinate) {
+  if (!Array.isArray(coordinate) || coordinate.length < 2) return null;
+  if (!Number.isFinite(coordinate[0]) || !Number.isFinite(coordinate[1])) return null;
+  return map.project(coordinate);
+}
+
+function screenPointDistance(first, second) {
+  if (!second) return Infinity;
+  return Math.hypot(first.x - second.x, first.y - second.y);
+}
+
+function minimumDistance(values, getDistance) {
+  let distance = Infinity;
+  for (const value of values ?? []) distance = Math.min(distance, getDistance(value));
+  return distance;
 }
 
 export function setHiddenLayers(draw, map, hiddenLayerIds) {
