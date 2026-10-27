@@ -16,6 +16,12 @@ export async function loadMap(mapId, accessToken) {
   return { map: publicResponse.payload.map, editable: false };
 }
 
+export async function listMaps(accessToken) {
+  requireToken(accessToken);
+  const response = await request('/maps', { accessToken });
+  return Array.isArray(response.payload.maps) ? response.payload.maps : [];
+}
+
 export async function createMap(map, accessToken) {
   requireToken(accessToken);
   const response = await request('/maps', {

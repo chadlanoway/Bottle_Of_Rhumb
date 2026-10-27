@@ -49,6 +49,7 @@ import {
 import { initializeAuth, signIn, signOut } from './auth.js';
 import {
   createMap as createSavedMap,
+  listMaps as listSavedMaps,
   loadMap as loadSavedMap,
   updateMap as updateSavedMap,
 } from './map-storage.js';
@@ -114,6 +115,8 @@ export default function App() {
   const [mapDescription, setMapDescription] = useState('');
   const [mapVisibility, setMapVisibility] = useState('draft');
   const [saveStatus, setSaveStatus] = useState('');
+  const [myMaps, setMyMaps] = useState([]);
+  const [myMapsStatus, setMyMapsStatus] = useState('');
   const [legend, setLegend] = useState({
     visible: true,
     title: 'Legend',
@@ -164,6 +167,29 @@ export default function App() {
         : '0 5px 18px rgba(0,0,0,.2)',
     );
   }, [legend]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const accessToken = authSession?.accessToken;
+    if (!accessToken) {
+      setMyMaps([]);
+      setMyMapsStatus('');
+      return undefined;
+    }
+
+    setMyMapsStatus('Loading maps…');
+    listSavedMaps(accessToken)
+      .then((maps) => {
+        if (cancelled) return;
+        setMyMaps(maps);
+        setMyMapsStatus(maps.length === 0 ? 'No saved maps yet.' : '');
+      })
+      .catch((caughtError) => {
+        if (!cancelled) setMyMapsStatus(caughtError.message || 'Maps could not be loaded.');
+      });
+
+    return () => { cancelled = true; };
+  }, [authSession?.accessToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1245,9 +1271,19 @@ export default function App() {
       url.search = '';
       url.searchParams.set('map', saved.mapId);
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+
+      const maps = await listSavedMaps(authSession.accessToken);
+      setMyMaps(maps);
+      setMyMapsStatus(maps.length === 0 ? 'No saved maps yet.' : '');
     } catch (caughtError) {
       setSaveStatus(caughtError.message || 'The map could not be saved.');
     }
+  }
+
+  function handleOpenSavedMap(savedMapId) {
+    const url = new URL(import.meta.env.BASE_URL, window.location.origin);
+    url.searchParams.set('map', savedMapId);
+    window.location.assign(url.toString());
   }
 
   async function handleSignIn(mode = 'login') {
@@ -1488,6 +1524,8 @@ export default function App() {
         mapId={mapId}
         mapTitle={mapTitle}
         mapVisibility={mapVisibility}
+        myMaps={myMaps}
+        myMapsStatus={myMapsStatus}
         ownsMap={ownsMap}
         saveStatus={saveStatus}
         selectedFeatureId={selectedFeatureId}
@@ -1518,6 +1556,7 @@ export default function App() {
         onMapDescriptionChange={setMapDescription}
         onMapTitleChange={setMapTitle}
         onMapVisibilityChange={setMapVisibility}
+        onOpenSavedMap={handleOpenSavedMap}
         onSaveMap={handleSaveMap}
         onSignIn={() => handleSignIn('login')}
         onSignOut={() => signOut()}

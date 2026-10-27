@@ -300,6 +300,8 @@ export default function Menu({
   mapId,
   mapTitle,
   mapVisibility,
+  myMaps,
+  myMapsStatus,
   ownsMap,
   saveStatus,
   savedView,
@@ -330,6 +332,7 @@ export default function Menu({
   onMapDescriptionChange,
   onMapTitleChange,
   onMapVisibilityChange,
+  onOpenSavedMap,
   onSaveMap,
   onSignIn,
   onSignOut,
@@ -442,12 +445,15 @@ export default function Menu({
               mapId={mapId}
               mapTitle={mapTitle}
               mapVisibility={mapVisibility}
+              myMaps={myMaps}
+              myMapsStatus={myMapsStatus}
               ownsMap={ownsMap}
               saveStatus={saveStatus}
               onCreateAccount={onCreateAccount}
               onMapDescriptionChange={onMapDescriptionChange}
               onMapTitleChange={onMapTitleChange}
               onMapVisibilityChange={onMapVisibilityChange}
+              onOpenSavedMap={onOpenSavedMap}
               onSaveMap={onSaveMap}
               onSignIn={onSignIn}
               onSignOut={onSignOut}
@@ -466,12 +472,15 @@ function ShareSection({
   mapId,
   mapTitle,
   mapVisibility,
+  myMaps,
+  myMapsStatus,
   ownsMap,
   saveStatus,
   onCreateAccount,
   onMapDescriptionChange,
   onMapTitleChange,
   onMapVisibilityChange,
+  onOpenSavedMap,
   onSaveMap,
   onSignIn,
   onSignOut,
@@ -508,6 +517,29 @@ function ShareSection({
           <div className="share-account-row">
             <span title={authSession.email}>{authSession.email}</span>
             <button type="button" onClick={onSignOut}>Sign out</button>
+          </div>
+
+          <div className="my-maps-card">
+            <p className="section-label">My maps</p>
+            {myMapsStatus && <p className="share-status" role="status">{myMapsStatus}</p>}
+            {myMaps.length > 0 && (
+              <div className="my-maps-list">
+                {myMaps.map((savedMap) => (
+                  <button
+                    className={String(savedMap.mapId) === String(mapId) ? 'is-current' : ''}
+                    key={savedMap.mapId}
+                    type="button"
+                    onClick={() => onOpenSavedMap(savedMap.mapId)}
+                  >
+                    <span>
+                      <strong>{savedMap.title || 'Untitled map'}</strong>
+                      <small>{formatSavedMapDate(savedMap.updatedAt)}</small>
+                    </span>
+                    <em>{savedMap.visibility === 'published' ? 'Published' : 'Draft'}</em>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {!ownsMap && mapId && (
@@ -594,6 +626,17 @@ function makeMapUrl(mapId, mode) {
   url.searchParams.set('map', mapId);
   url.searchParams.set(mode, '1');
   return url.toString();
+}
+
+function formatSavedMapDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `Updated ${date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })}`;
 }
 
 function escapeAttribute(value) {

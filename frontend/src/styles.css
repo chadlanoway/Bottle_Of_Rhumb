@@ -2838,6 +2838,70 @@ button:disabled {
   cursor: pointer;
 }
 
+.my-maps-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.my-maps-card .section-label {
+  margin: 0;
+}
+
+.my-maps-list {
+  display: grid;
+  gap: 6px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.my-maps-list > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 8px 9px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .055);
+  color: white;
+  cursor: pointer;
+  text-align: left;
+}
+
+.my-maps-list > button:hover,
+.my-maps-list > button.is-current {
+  border-color: var(--blue);
+  background: rgba(30, 144, 255, .14);
+}
+
+.my-maps-list span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.my-maps-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-maps-list small,
+.my-maps-list em {
+  color: var(--muted);
+  font-size: .68rem;
+  font-style: normal;
+}
+
+.my-maps-list em {
+  flex: 0 0 auto;
+}
+
 .share-section > input,
 .share-description,
 .share-copy-row input,
