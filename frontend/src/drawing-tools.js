@@ -362,7 +362,7 @@ export function previewFeaturePopup(draw, map, id, styleDefaults = {}) {
   if (!feature?.properties?.popupEnabled) return;
 
   previewPopups.get(map)?.remove();
-  const popup = new Popup({ closeButton: true, closeOnClick: false, maxWidth: '320px' })
+  const popup = new Popup({ closeButton: true, closeOnClick: false, maxWidth: '420px' })
     .setLngLat(popupCoordinates(feature, map))
     .setDOMContent(buildPopupElement(feature.properties))
     .addTo(map);
@@ -1078,9 +1078,10 @@ function buildPopupElement(properties) {
     iframe.src = youtubeEmbedUrl;
     iframe.title = title ? `${title} video` : 'YouTube video';
     iframe.loading = 'lazy';
-    iframe.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share';
+    iframe.allow = 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share';
     iframe.allowFullscreen = true;
     iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    iframe.sandbox = 'allow-scripts allow-same-origin allow-presentation';
     video.appendChild(iframe);
     container.appendChild(video);
   }
@@ -1124,7 +1125,11 @@ function getYouTubeEmbedUrl(value) {
         : url.pathname.match(/^\/(?:shorts|embed)\/([^/?]+)/)?.[1] || null;
     }
     if (!/^[A-Za-z0-9_-]{6,20}$/.test(videoId || '')) return null;
-    return `https://www.youtube-nocookie.com/embed/${videoId}`;
+    const embed = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+    embed.searchParams.set('controls', '1');
+    embed.searchParams.set('playsinline', '1');
+    embed.searchParams.set('rel', '0');
+    return embed.toString();
   } catch {
     return null;
   }
