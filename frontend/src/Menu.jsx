@@ -125,13 +125,24 @@ export function EditorToolbar({
   const [searchMessage, setSearchMessage] = useState('');
   const [locating, setLocating] = useState(false);
   const drawMenuRef = useRef(null);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     function closeDrawMenu(event) {
       if (!drawMenuRef.current?.contains(event.target)) setDrawMenuOpen(false);
     }
+    function closeSearchResults(event) {
+      if (!searchRef.current?.contains(event.target)) {
+        setSearchResults([]);
+        setSearchMessage('');
+      }
+    }
     document.addEventListener('pointerdown', closeDrawMenu);
-    return () => document.removeEventListener('pointerdown', closeDrawMenu);
+    document.addEventListener('pointerdown', closeSearchResults);
+    return () => {
+      document.removeEventListener('pointerdown', closeDrawMenu);
+      document.removeEventListener('pointerdown', closeSearchResults);
+    };
   }, []);
 
   useEffect(() => {
@@ -212,7 +223,7 @@ export function EditorToolbar({
         )}
       </div>
 
-      <form className="address-search" role="search" onSubmit={submitSearch}>
+      <form className="address-search" role="search" onSubmit={submitSearch} ref={searchRef}>
         <input
           type="search"
           value={searchQuery}
@@ -228,12 +239,20 @@ export function EditorToolbar({
             {searchMessage && <p>{searchMessage}</p>}
             {searchResults.map((result) => (
               <div className="address-search-result" key={result.id ?? result.label}>
-                <button className="search-result-main" type="button" onClick={() => onPreviewSearchResult(result)}>
+                <button
+                  className="search-result-main"
+                  type="button"
+                  onClick={() => {
+                    onPreviewSearchResult(result);
+                    setSearchResults([]);
+                    setSearchMessage('');
+                  }}
+                >
                   <strong>{result.name || result.label}</strong>
                   {result.name && <span>{result.label}</span>}
                 </button>
                 <div className="search-result-actions">
-                  <button type="button" onClick={() => { onPreviewSearchResult(result); onAddSearchPoint(result); clearSearch(); }}>Add point</button>
+                  <button type="button" onClick={() => { onAddSearchPoint(result); clearSearch(); }}>Add point</button>
                   <button type="button" onClick={() => { onUseSearchAsRouteStart(result, routeProfile); clearSearch(); }}>Route from here</button>
                 </div>
               </div>
