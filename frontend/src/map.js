@@ -78,7 +78,7 @@ export const BASEMAPS = [
     id: 'three-d',
     name: '3D',
     description: 'OpenFreeMap streets with extruded buildings.',
-    style: 'https://tiles.openfreemap.org/styles/3d',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
   },
 ];
 
