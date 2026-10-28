@@ -315,6 +315,7 @@ export default function Menu({
   features,
   layers,
   legend,
+  mapControls,
   mapDescription,
   mapId,
   mapTitle,
@@ -340,6 +341,7 @@ export default function Menu({
   onFitToFeatures,
   onLayerChange,
   onLegendChange,
+  onMapControlsChange,
   onLegendLayerChange,
   onRenameLayer,
   onPreviewView,
@@ -444,6 +446,7 @@ export default function Menu({
               disabled={disabled}
               layers={layers}
               legend={legend}
+              mapControls={mapControls}
               savedView={savedView}
               viewMessage={viewMessage}
               onBasemapChange={onBasemapChange}
@@ -451,6 +454,7 @@ export default function Menu({
               onClearView={onClearView}
               onFitToFeatures={onFitToFeatures}
               onLegendChange={onLegendChange}
+              onMapControlsChange={onMapControlsChange}
               onLegendLayerChange={onLegendLayerChange}
               onPreviewView={onPreviewView}
               onSaveView={onSaveView}
@@ -787,6 +791,7 @@ function MapSection({
   disabled,
   layers,
   legend,
+  mapControls,
   savedView,
   viewMessage,
   onBasemapChange,
@@ -794,6 +799,7 @@ function MapSection({
   onClearView,
   onFitToFeatures,
   onLegendChange,
+  onMapControlsChange,
   onLegendLayerChange,
   onPreviewView,
   onSaveView,
@@ -884,6 +890,80 @@ function MapSection({
       </p>
 
       <div className="map-settings-divider" />
+      <p className="section-label">Map controls</p>
+      <p className="section-help">Style the map-control pill and its active buttons.</p>
+      <fieldset className="legend-appearance-fieldset map-controls-appearance-fieldset">
+        <legend>Appearance</legend>
+        <div className="legend-appearance-grid">
+          <label>
+            <span className="field-label">Background</span>
+            <input className="legend-color-input" type="color" value={mapControls.backgroundColor}
+              onChange={(event) => onMapControlsChange({ backgroundColor: event.target.value })} />
+          </label>
+          <label>
+            <span className="field-label">Icons</span>
+            <input className="legend-color-input" type="color" value={mapControls.iconColor}
+              onChange={(event) => onMapControlsChange({ iconColor: event.target.value })} />
+          </label>
+          <label>
+            <span className="field-label">Active color</span>
+            <input className="legend-color-input" type="color" value={mapControls.accentColor}
+              onChange={(event) => onMapControlsChange({ accentColor: event.target.value })} />
+          </label>
+          <label>
+            <span className="field-label">Active icon</span>
+            <input className="legend-color-input" type="color" value={mapControls.activeTextColor}
+              onChange={(event) => onMapControlsChange({ activeTextColor: event.target.value })} />
+          </label>
+          <label>
+            <span className="field-label">Border</span>
+            <input className="legend-color-input" type="color" value={mapControls.borderColor}
+              onChange={(event) => onMapControlsChange({ borderColor: event.target.value })} />
+          </label>
+        </div>
+
+        <label className="legend-range-field"><span>Background opacity</span>
+          <input type="range" min="20" max="100" step="1" value={mapControls.backgroundOpacity}
+            onChange={(event) => onMapControlsChange({ backgroundOpacity: Number(event.target.value) })} />
+          <output>{mapControls.backgroundOpacity}%</output>
+        </label>
+        <label className="legend-range-field"><span>Border width</span>
+          <input type="range" min="0" max="6" step="1" value={mapControls.borderWidth}
+            onChange={(event) => onMapControlsChange({ borderWidth: Number(event.target.value) })} />
+          <output>{mapControls.borderWidth}px</output>
+        </label>
+        <label className="legend-range-field"><span>Border opacity</span>
+          <input type="range" min="0" max="100" step="1" value={mapControls.borderOpacity}
+            onChange={(event) => onMapControlsChange({ borderOpacity: Number(event.target.value) })} />
+          <output>{mapControls.borderOpacity}%</output>
+        </label>
+        <label className="legend-range-field"><span>Corner radius</span>
+          <input type="range" min="0" max="30" step="1" value={mapControls.borderRadius}
+            onChange={(event) => onMapControlsChange({ borderRadius: Number(event.target.value) })} />
+          <output>{mapControls.borderRadius}px</output>
+        </label>
+
+        <label className="legend-glow-toggle">
+          <input type="checkbox" checked={mapControls.glowEnabled}
+            onChange={(event) => onMapControlsChange({ glowEnabled: event.target.checked })} />
+          <span>Box glow</span>
+        </label>
+        {mapControls.glowEnabled && (
+          <div className="legend-glow-options">
+            <label><span className="field-label">Glow color</span>
+              <input className="legend-color-input" type="color" value={mapControls.glowColor}
+                onChange={(event) => onMapControlsChange({ glowColor: event.target.value })} />
+            </label>
+            <label className="legend-range-field"><span>Glow size</span>
+              <input type="range" min="4" max="40" step="1" value={mapControls.glowSize}
+                onChange={(event) => onMapControlsChange({ glowSize: Number(event.target.value) })} />
+              <output>{mapControls.glowSize}px</output>
+            </label>
+          </div>
+        )}
+      </fieldset>
+
+      <div className="map-settings-divider" />
       <div className="section-heading-row">
         <p className="section-label">Legend</p>
         <label className="legend-master-toggle">
@@ -963,6 +1043,29 @@ function MapSection({
             onChange={(event) => onLegendChange({ backgroundOpacity: Number(event.target.value) })}
           />
           <output>{legend.backgroundOpacity}%</output>
+        </label>
+
+        <div className="legend-border-options">
+          <label>
+            <span className="field-label">Border color</span>
+            <input className="legend-color-input" type="color" value={legend.borderColor}
+              onChange={(event) => onLegendChange({ borderColor: event.target.value })} />
+          </label>
+          <label className="legend-range-field"><span>Border width</span>
+            <input type="range" min="0" max="10" step="1" value={legend.borderWidth}
+              onChange={(event) => onLegendChange({ borderWidth: Number(event.target.value) })} />
+            <output>{legend.borderWidth}px</output>
+          </label>
+        </div>
+        <label className="legend-range-field"><span>Border opacity</span>
+          <input type="range" min="0" max="100" step="1" value={legend.borderOpacity}
+            onChange={(event) => onLegendChange({ borderOpacity: Number(event.target.value) })} />
+          <output>{legend.borderOpacity}%</output>
+        </label>
+        <label className="legend-range-field"><span>Corner radius</span>
+          <input type="range" min="0" max="30" step="1" value={legend.borderRadius}
+            onChange={(event) => onLegendChange({ borderRadius: Number(event.target.value) })} />
+          <output>{legend.borderRadius}px</output>
         </label>
 
         <label className="legend-glow-toggle">

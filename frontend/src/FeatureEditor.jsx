@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getBasemapStyleDefaults } from './style-defaults.js';
 
 const RESERVED_PROPERTIES = new Set([
   'name',
@@ -14,6 +15,15 @@ const RESERVED_PROPERTIES = new Set([
   'featureOpacity',
   'featureSize',
   'featureDash',
+  'featureFillColor',
+  'featureFillOpacity',
+  'featureBorderColor',
+  'featureBorderOpacity',
+  'featureBorderWidth',
+  'featureGlowEnabled',
+  'featureGlowColor',
+  'featureGlowSize',
+  'featureGlowOpacity',
   'labelEnabled',
   'labelText',
   'text',
@@ -40,6 +50,11 @@ const RESERVED_PROPERTIES = new Set([
   'popupGlowEnabled',
   'popupGlowColor',
   'popupGlowSize',
+  'popupBorderColor',
+  'popupBorderOpacity',
+  'popupBorderWidth',
+  'popupBorderRadius',
+  'popupMaxWidth',
 ]);
 
 const FONT_OPTIONS = [
@@ -48,12 +63,13 @@ const FONT_OPTIONS = [
   { value: 'mono', label: 'Monospace' },
 ];
 
-export default function FeatureEditor({ feature, features = [], legend, onDelete, onGeometryOperation, onImageUpload, onPreview, onUpdate, openRequest, tutorialExpanded, tutorialTab }) {
+export default function FeatureEditor({ feature, features = [], basemapId, onDelete, onGeometryOperation, onImageUpload, onPreview, onUpdate, openRequest, tutorialExpanded, tutorialTab }) {
   const [collapsed, setCollapsed] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [rows, setRows] = useState([]);
   const selectionCount = features.length || (feature ? 1 : 0);
   const multiple = selectionCount > 1;
+  const styleDefaults = getBasemapStyleDefaults(basemapId);
 
   const customProperties = useMemo(
     () => Object.entries(feature?.properties ?? {}).filter(
@@ -170,7 +186,7 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
               onChange={(event) => onUpdate({ description: event.target.value })}
             />
             {!isTextFeature && (
-              <AppearanceControls feature={feature} onUpdate={onUpdate} />
+              <AppearanceControls defaults={styleDefaults.feature} feature={feature} onUpdate={onUpdate} />
             )}
           </>
         )}
@@ -213,13 +229,13 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
         )}
 
         {!multiple && activeTab === 'text' && (
-          <TextControls feature={feature} isTextFeature={isTextFeature} onUpdate={onUpdate} />
+          <TextControls defaults={styleDefaults.text} feature={feature} isTextFeature={isTextFeature} onUpdate={onUpdate} />
         )}
 
         {!multiple && activeTab === 'popup' && (
           <PopupControls
             feature={feature}
-            legend={legend}
+            defaults={styleDefaults.popup}
             onCollapse={() => setCollapsed(true)}
             onImageUpload={onImageUpload}
             onPreview={onPreview}
@@ -242,16 +258,31 @@ export default function FeatureEditor({ feature, features = [], legend, onDelete
   );
 }
 
-function AppearanceControls({ feature, onUpdate }) {
+function AppearanceControls({ defaults, feature, onUpdate }) {
   const properties = feature.properties ?? {};
   const geometryType = feature.geometry?.type;
   const isPoint = geometryType === 'Point' || geometryType === 'MultiPoint';
+  const isLine = geometryType === 'LineString' || geometryType === 'MultiLineString';
   const supportsDash = geometryType === 'LineString'
     || geometryType === 'MultiLineString'
     || geometryType === 'Polygon'
     || geometryType === 'MultiPolygon';
-  const size = Number(properties.featureSize ?? (isPoint ? 6 : 3));
-  const opacity = Number(properties.featureOpacity ?? 100);
+  const size = Number(properties.featureSize ?? (isPoint ? defaults.pointSize : defaults.lineWidth));
+  const opacity = Number(properties.featureOpacity ?? defaults.opacity);
+  const isPolygon = geometryType === 'Polygon' || geometryType === 'MultiPolygon';
+  const supportsBorder = isPoint || isLine || isPolygon;
+  const borderColor = properties.featureBorderColor ?? defaults.borderColor;
+  const borderOpacity = Number(properties.featureBorderOpacity ?? defaults.borderOpacity);
+  const defaultBorderWidth = isPoint
+    ? defaults.pointBorderWidth
+    : isLine ? defaults.lineBorderWidth : defaults.polygonBorderWidth;
+  const borderWidth = Number(properties.featureBorderWidth ?? defaultBorderWidth);
+  const fillColor = properties.featureFillColor ?? properties.featureColor ?? defaults.fillColor;
+  const fillOpacity = Number(properties.featureFillOpacity ?? defaults.fillOpacity);
+  const glowEnabled = properties.featureGlowEnabled ?? defaults.glowEnabled;
+  const glowColor = properties.featureGlowColor ?? properties.featureColor ?? defaults.glowColor;
+  const glowSize = Number(properties.featureGlowSize ?? defaults.glowSize);
+  const glowOpacity = Number(properties.featureGlowOpacity ?? defaults.glowOpacity);
 
   return (
     <fieldset className="feature-appearance-fieldset">
@@ -262,7 +293,7 @@ function AppearanceControls({ feature, onUpdate }) {
           <input
             className="feature-color-input"
             type="color"
-            value={properties.featureColor ?? '#1e90ff'}
+            value={properties.featureColor ?? defaults.color}
             onChange={(event) => onUpdate({ featureColor: event.target.value })}
           />
         </label>
@@ -271,7 +302,7 @@ function AppearanceControls({ feature, onUpdate }) {
           <label>
             <span className="field-label">Line style</span>
             <select
-              value={properties.featureDash ?? 'solid'}
+              value={properties.featureDash ?? defaults.dash}
               onChange={(event) => onUpdate({ featureDash: event.target.value })}
             >
               <option value="solid">Solid</option>
@@ -297,6 +328,69 @@ function AppearanceControls({ feature, onUpdate }) {
         </div>
       </label>
 
+      {isPolygon && (
+        <div className="feature-subsection">
+          <strong>Polygon fill</strong>
+          <div className="feature-appearance-grid">
+            <label>
+              <span className="field-label">Fill color</span>
+              <input className="feature-color-input" type="color" value={fillColor}
+                onChange={(event) => onUpdate({ featureFillColor: event.target.value })} />
+            </label>
+          </div>
+          <label className="feature-appearance-range">
+            <span>Fill opacity</span>
+            <div><input type="range" min="0" max="100" step="1" value={fillOpacity}
+              onChange={(event) => onUpdate({ featureFillOpacity: Number(event.target.value) })} />
+              <output>{fillOpacity}%</output></div>
+          </label>
+        </div>
+      )}
+
+      {supportsBorder && (
+        <div className="feature-subsection">
+          <strong>Border</strong>
+          <div className="feature-appearance-grid">
+            <label>
+              <span className="field-label">Border color</span>
+              <input className="feature-color-input" type="color" value={borderColor}
+                onChange={(event) => onUpdate({ featureBorderColor: event.target.value })} />
+            </label>
+          </div>
+          <label className="feature-appearance-range"><span>Border width</span><div>
+            <input type="range" min="0" max="12" step="1" value={borderWidth}
+              onChange={(event) => onUpdate({ featureBorderWidth: Number(event.target.value) })} />
+            <output>{borderWidth}px</output></div></label>
+          <label className="feature-appearance-range"><span>Border opacity</span><div>
+            <input type="range" min="0" max="100" step="1" value={borderOpacity}
+              onChange={(event) => onUpdate({ featureBorderOpacity: Number(event.target.value) })} />
+            <output>{borderOpacity}%</output></div></label>
+        </div>
+      )}
+
+      <div className="feature-subsection">
+        <label className="legend-glow-toggle">
+          <input type="checkbox" checked={glowEnabled}
+            onChange={(event) => onUpdate({ featureGlowEnabled: event.target.checked })} />
+          <span>Feature glow</span>
+        </label>
+        {glowEnabled && <>
+          <div className="feature-appearance-grid"><label>
+            <span className="field-label">Glow color</span>
+            <input className="feature-color-input" type="color" value={glowColor}
+              onChange={(event) => onUpdate({ featureGlowColor: event.target.value })} />
+          </label></div>
+          <label className="feature-appearance-range"><span>Glow size</span><div>
+            <input type="range" min="2" max="30" step="1" value={glowSize}
+              onChange={(event) => onUpdate({ featureGlowSize: Number(event.target.value) })} />
+            <output>{glowSize}px</output></div></label>
+          <label className="feature-appearance-range"><span>Glow opacity</span><div>
+            <input type="range" min="5" max="100" step="1" value={glowOpacity}
+              onChange={(event) => onUpdate({ featureGlowOpacity: Number(event.target.value) })} />
+            <output>{glowOpacity}%</output></div></label>
+        </>}
+      </div>
+
       <label className="feature-appearance-range">
         <span>Opacity</span>
         <div>
@@ -320,6 +414,15 @@ function AppearanceControls({ feature, onUpdate }) {
           featureOpacity: undefined,
           featureSize: undefined,
           featureDash: undefined,
+          featureFillColor: undefined,
+          featureFillOpacity: undefined,
+          featureBorderColor: undefined,
+          featureBorderOpacity: undefined,
+          featureBorderWidth: undefined,
+          featureGlowEnabled: undefined,
+          featureGlowColor: undefined,
+          featureGlowSize: undefined,
+          featureGlowOpacity: undefined,
         })}
       >
         Reset appearance
@@ -380,16 +483,21 @@ function GeometryControls({ feature, selectionCount, onRun }) {
   );
 }
 
-function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, onUpdate }) {
+function PopupControls({ defaults, feature, onCollapse, onImageUpload, onPreview, onUpdate }) {
   const properties = feature.properties ?? {};
   const enabled = properties.popupEnabled === true;
-  const backgroundColor = properties.popupBackgroundColor ?? legend?.backgroundColor ?? '#172229';
-  const backgroundOpacity = properties.popupBackgroundOpacity ?? legend?.backgroundOpacity ?? 90;
-  const textColor = properties.popupTextColor ?? legend?.textColor ?? '#ffffff';
-  const fontFamily = properties.popupFontFamily ?? legend?.fontFamily ?? 'sans';
-  const glowEnabled = properties.popupGlowEnabled ?? legend?.glowEnabled ?? false;
-  const glowColor = properties.popupGlowColor ?? legend?.glowColor ?? '#1e90ff';
-  const glowSize = properties.popupGlowSize ?? legend?.glowSize ?? 18;
+  const backgroundColor = properties.popupBackgroundColor ?? defaults.backgroundColor;
+  const backgroundOpacity = properties.popupBackgroundOpacity ?? defaults.backgroundOpacity;
+  const textColor = properties.popupTextColor ?? defaults.textColor;
+  const fontFamily = properties.popupFontFamily ?? defaults.fontFamily;
+  const glowEnabled = properties.popupGlowEnabled ?? defaults.glowEnabled;
+  const glowColor = properties.popupGlowColor ?? defaults.glowColor;
+  const glowSize = properties.popupGlowSize ?? defaults.glowSize;
+  const borderColor = properties.popupBorderColor ?? defaults.borderColor;
+  const borderOpacity = properties.popupBorderOpacity ?? defaults.borderOpacity;
+  const borderWidth = properties.popupBorderWidth ?? defaults.borderWidth;
+  const borderRadius = properties.popupBorderRadius ?? defaults.borderRadius;
+  const maxWidth = properties.popupMaxWidth ?? defaults.maxWidth;
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
   const selectedFields = Array.isArray(properties.popupFields) ? properties.popupFields : [];
@@ -435,6 +543,11 @@ function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, 
       popupGlowEnabled: undefined,
       popupGlowColor: undefined,
       popupGlowSize: undefined,
+      popupBorderColor: undefined,
+      popupBorderOpacity: undefined,
+      popupBorderWidth: undefined,
+      popupBorderRadius: undefined,
+      popupMaxWidth: undefined,
     });
   }
 
@@ -582,6 +695,36 @@ function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, 
               <output>{backgroundOpacity}%</output>
             </label>
 
+            <div className="popup-style-section">
+              <strong>Border and shape</strong>
+              <div className="popup-appearance-grid">
+                <label><span className="field-label">Border color</span>
+                  <input className="legend-color-input" type="color" value={borderColor}
+                    onChange={(event) => onUpdate({ popupBorderColor: event.target.value })} />
+                </label>
+              </div>
+              <label className="legend-range-field"><span>Border width</span>
+                <input type="range" min="0" max="10" step="1" value={borderWidth}
+                  onChange={(event) => onUpdate({ popupBorderWidth: Number(event.target.value) })} />
+                <output>{borderWidth}px</output>
+              </label>
+              <label className="legend-range-field"><span>Border opacity</span>
+                <input type="range" min="0" max="100" step="1" value={borderOpacity}
+                  onChange={(event) => onUpdate({ popupBorderOpacity: Number(event.target.value) })} />
+                <output>{borderOpacity}%</output>
+              </label>
+              <label className="legend-range-field"><span>Corner radius</span>
+                <input type="range" min="0" max="30" step="1" value={borderRadius}
+                  onChange={(event) => onUpdate({ popupBorderRadius: Number(event.target.value) })} />
+                <output>{borderRadius}px</output>
+              </label>
+              <label className="legend-range-field"><span>Popup width</span>
+                <input type="range" min="220" max="600" step="10" value={maxWidth}
+                  onChange={(event) => onUpdate({ popupMaxWidth: Number(event.target.value) })} />
+                <output>{maxWidth}px</output>
+              </label>
+            </div>
+
             <label className="legend-glow-toggle">
               <input
                 type="checkbox"
@@ -616,6 +759,9 @@ function PopupControls({ feature, legend, onCollapse, onImageUpload, onPreview, 
                 </label>
               </div>
             )}
+            <button className="reset-feature-appearance" type="button" onClick={resetAppearance}>
+              Reset popup appearance
+            </button>
           </fieldset>
 
           <p className="field-label popup-fields-heading">Properties to display</p>
@@ -667,7 +813,7 @@ function isYouTubeUrl(value) {
   }
 }
 
-function TextControls({ feature, isTextFeature, onUpdate }) {
+function TextControls({ defaults, feature, isTextFeature, onUpdate }) {
   const properties = feature.properties ?? {};
   const enabled = isTextFeature || properties.labelEnabled === true;
 
@@ -700,7 +846,7 @@ function TextControls({ feature, isTextFeature, onUpdate }) {
             <label>
               <span className="field-label">Font</span>
               <select
-                value={properties.textFont ?? 'sans'}
+                value={properties.textFont ?? defaults.fontFamily}
                 onChange={(event) => onUpdate({ textFont: event.target.value })}
               >
                 {FONT_OPTIONS.map((option) => (
@@ -713,7 +859,7 @@ function TextControls({ feature, isTextFeature, onUpdate }) {
               <input
                 className="color-input"
                 type="color"
-                value={properties.textColor ?? '#172229'}
+                value={properties.textColor ?? defaults.color}
                 onChange={(event) => onUpdate({ textColor: event.target.value })}
               />
             </label>
@@ -725,10 +871,10 @@ function TextControls({ feature, isTextFeature, onUpdate }) {
                   min="10"
                   max="40"
                   step="1"
-                  value={properties.textSize ?? 16}
+                  value={properties.textSize ?? defaults.size}
                   onChange={(event) => onUpdate({ textSize: Number(event.target.value) })}
                 />
-                <output>{properties.textSize ?? 16}px</output>
+                <output>{properties.textSize ?? defaults.size}px</output>
               </div>
             </label>
           </div>
@@ -749,14 +895,14 @@ function TextControls({ feature, isTextFeature, onUpdate }) {
                   <input
                     className="color-input"
                     type="color"
-                    value={properties.backgroundColor ?? '#ffffff'}
+                    value={properties.backgroundColor ?? defaults.backgroundColor}
                     onChange={(event) => onUpdate({ backgroundColor: event.target.value })}
                   />
                 </label>
                 <label className="toggle-field compact-toggle">
                   <input
                     type="checkbox"
-                    checked={properties.backgroundRounded !== false}
+                    checked={properties.backgroundRounded ?? defaults.backgroundRounded}
                     onChange={(event) => onUpdate({ backgroundRounded: event.target.checked })}
                   />
                   <span>Rounded corners</span>
@@ -764,7 +910,7 @@ function TextControls({ feature, isTextFeature, onUpdate }) {
                 <label className="toggle-field compact-toggle">
                   <input
                     type="checkbox"
-                    checked={properties.backgroundShadow !== false}
+                    checked={properties.backgroundShadow ?? defaults.backgroundShadow}
                     onChange={(event) => onUpdate({ backgroundShadow: event.target.checked })}
                   />
                   <span>Box shadow</span>

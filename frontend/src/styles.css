@@ -1433,6 +1433,21 @@ select:focus-visible {
   align-items: end;
 }
 
+.feature-subsection,
+.popup-style-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.feature-subsection > strong,
+.popup-style-section > strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
 .feature-styled-popup .maplibregl-popup-close-button {
   color: inherit;
 }
@@ -2034,6 +2049,22 @@ button:disabled {
   margin-top: 5px;
 }
 
+.legend-border-options {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.legend-border-options .legend-range-field {
+  margin-top: 0;
+}
+
+.map-controls-appearance-fieldset .legend-appearance-grid {
+  grid-template-columns: repeat(3, 58px);
+}
+
 .legend-glow-options .legend-range-field {
   margin: 0 0 2px;
 }
@@ -2257,8 +2288,11 @@ button:disabled {
   display: flex;
   flex-direction: column;
   padding: 4px;
-  border: 1px solid var(--panel-border);
-  box-shadow: 0 7px 22px rgba(0, 0, 0, .36) !important;
+  overflow: hidden;
+  border: var(--rhumb-control-border-width, 1px) solid var(--rhumb-control-border, var(--panel-border));
+  border-radius: var(--rhumb-control-radius, 24px) !important;
+  background: var(--rhumb-control-background, rgba(16, 25, 30, .94)) !important;
+  box-shadow: var(--rhumb-control-shadow, 0 7px 22px rgba(0, 0, 0, .36)) !important;
   backdrop-filter: blur(7px);
 }
 
@@ -2270,12 +2304,12 @@ button:disabled {
   border: 0 !important;
   border-radius: 50%;
   background: transparent;
-  color: #eef5f8;
+  color: var(--rhumb-control-color, #eef5f8);
   font: 700 20px/1 system-ui, sans-serif;
 }
 
 .rhumb-map-controls .rhumb-control-compass {
-  color: var(--green);
+  color: var(--rhumb-control-accent, var(--green));
   font-size: 24px;
 }
 
@@ -2285,7 +2319,7 @@ button:disabled {
 }
 
 .rhumb-map-controls .rhumb-control-wind {
-  border-top: 1px solid var(--panel-border) !important;
+  border-top: 1px solid var(--rhumb-control-border, var(--panel-border)) !important;
 }
 
 .rhumb-map-controls .rhumb-control-ports,
@@ -2295,7 +2329,7 @@ button:disabled {
 
 .rhumb-map-controls .rhumb-control-reference-start {
   margin-top: 3px;
-  border-top: 1px solid var(--panel-border) !important;
+  border-top: 1px solid var(--rhumb-control-border, var(--panel-border)) !important;
 }
 
 .reference-place-popup {
@@ -2394,9 +2428,13 @@ button:disabled {
 }
 
 .rhumb-map-controls .rhumb-control-button.is-active {
-  background: var(--blue) !important;
-  color: #06121a;
+  background: var(--rhumb-control-accent, var(--blue)) !important;
+  color: var(--rhumb-control-active-text, #06121a);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22);
+}
+
+.rhumb-map-controls .rhumb-control-button:hover:not(:disabled) {
+  background-color: var(--rhumb-control-hover, rgba(30, 144, 255, .28)) !important;
 }
 
 .rhumb-map-controls .rhumb-control-button.is-loading {

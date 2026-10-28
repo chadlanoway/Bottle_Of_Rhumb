@@ -54,6 +54,7 @@ import {
   loadMap as loadSavedMap,
   updateMap as updateSavedMap,
 } from './map-storage.js';
+import { DEFAULT_STYLE, getBasemapStyleDefaults } from './style-defaults.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -123,14 +124,9 @@ export default function App() {
     visible: true,
     title: 'Legend',
     position: 'bottom-right',
-    backgroundColor: '#172229',
-    backgroundOpacity: 90,
-    textColor: '#ffffff',
-    fontFamily: 'sans',
-    glowEnabled: false,
-    glowColor: '#1e90ff',
-    glowSize: 18,
+    ...DEFAULT_STYLE.legend,
   });
+  const [mapControls, setMapControls] = useState({ ...DEFAULT_STYLE.controls });
   const legendRef = useRef(legend);
   legendRef.current = legend;
 
@@ -169,6 +165,34 @@ export default function App() {
         : '0 5px 18px rgba(0,0,0,.2)',
     );
   }, [legend]);
+
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+    container.style.setProperty(
+      '--rhumb-control-background',
+      hexToRgba(mapControls.backgroundColor, mapControls.backgroundOpacity / 100),
+    );
+    container.style.setProperty('--rhumb-control-color', mapControls.iconColor);
+    container.style.setProperty('--rhumb-control-accent', mapControls.accentColor);
+    container.style.setProperty('--rhumb-control-active-text', mapControls.activeTextColor);
+    container.style.setProperty(
+      '--rhumb-control-border',
+      hexToRgba(mapControls.borderColor, mapControls.borderOpacity / 100),
+    );
+    container.style.setProperty('--rhumb-control-border-width', `${mapControls.borderWidth}px`);
+    container.style.setProperty('--rhumb-control-radius', `${mapControls.borderRadius}px`);
+    container.style.setProperty(
+      '--rhumb-control-shadow',
+      mapControls.glowEnabled
+        ? `0 0 ${mapControls.glowSize}px ${mapControls.glowColor}, 0 7px 22px rgba(0,0,0,.36)`
+        : '0 7px 22px rgba(0,0,0,.36)',
+    );
+    container.style.setProperty(
+      '--rhumb-control-hover',
+      hexToRgba(mapControls.accentColor, 0.28),
+    );
+  }, [mapControls]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,9 +257,16 @@ export default function App() {
         setBasemapId(document.basemapId || 'positron');
         setProjection(document.projection === 'globe' ? 'globe' : 'mercator');
         setSavedView(document.view || null);
-        if (document.legend) {
-          setLegend((current) => ({ ...current, ...document.legend }));
-        }
+        const loadedStyleDefaults = getBasemapStyleDefaults(document.basemapId || 'positron');
+        setLegend((current) => ({
+          ...current,
+          ...loadedStyleDefaults.legend,
+          ...(document.legend ?? {}),
+        }));
+        setMapControls({
+          ...loadedStyleDefaults.controls,
+          ...(document.mapControls ?? {}),
+        });
         setMapId(document.mapId);
         setMapRevision(document.revision || 0);
         setOwnsMap(loaded.editable);
@@ -296,13 +327,14 @@ export default function App() {
         (collection) => setFeatures(collection.features),
         () => activeLayerIdRef.current,
         handleSelectionChange,
+        nextBasemapId,
       );
       drawRef.current = draw;
       if (viewerMode) {
         setupViewerFeatureInteractions(
           draw,
           map,
-          () => legendRef.current,
+          () => getBasemapStyleDefaults(nextBasemapId).popup,
         );
       }
       routingControllerRef.current = createLandRoutingController(map, {
@@ -1227,6 +1259,14 @@ export default function App() {
       restoredView,
       projection,
     );
+    setLegend((current) => ({
+      ...current,
+      ...getBasemapStyleDefaults(nextId).legend,
+    }));
+    setMapControls((current) => ({
+      ...current,
+      ...getBasemapStyleDefaults(nextId).controls,
+    }));
     setBasemapId(nextId);
   }
 
@@ -1238,6 +1278,10 @@ export default function App() {
 
   function handleLegendChange(changes) {
     setLegend((current) => ({ ...current, ...changes }));
+  }
+
+  function handleMapControlsChange(changes) {
+    setMapControls((current) => ({ ...current, ...changes }));
   }
 
   function handleLegendLayerChange(id, changes) {
@@ -1255,6 +1299,7 @@ export default function App() {
       projection,
       view: savedView || getMapView(mapRef.current),
       legend,
+      mapControls,
       layers,
       activeLayerId,
       featureCollection: {
@@ -1569,6 +1614,7 @@ export default function App() {
         features={features}
         layers={layers}
         legend={legend}
+        mapControls={mapControls}
         mapDescription={mapDescription}
         mapId={mapId}
         mapTitle={mapTitle}
@@ -1593,6 +1639,7 @@ export default function App() {
         onDuplicateFeature={handleDuplicateFeature}
         onLayerChange={setActiveLayerId}
         onLegendChange={handleLegendChange}
+        onMapControlsChange={handleMapControlsChange}
         onLegendLayerChange={handleLegendLayerChange}
         onRenameLayer={handleRenameLayer}
         onSelectFeature={handleSelectFeature}
@@ -1616,13 +1663,18 @@ export default function App() {
           : ['map', 'map', 'layers', 'layers', 'data', 'share'][tutorialStep]}
       />}
       {!viewerMode && <FeatureEditor
+        basemapId={basemapId}
         feature={selectedFeature}
         features={selectedFeatures}
-        legend={legend}
         onDelete={handleDeleteFeature}
         onGeometryOperation={handleGeometryOperation}
         onImageUpload={handlePopupImageUpload}
-        onPreview={() => previewFeaturePopup(drawRef.current, mapRef.current, selectedFeatureId, legend)}
+        onPreview={() => previewFeaturePopup(
+          drawRef.current,
+          mapRef.current,
+          selectedFeatureId,
+          getBasemapStyleDefaults(basemapId).popup,
+        )}
         onUpdate={(properties) => updateFeature(drawRef.current, selectedFeatureId, properties)}
         openRequest={featureEditorRequest}
         tutorialExpanded={tutorialStep === 3 ? false : undefined}
@@ -1677,6 +1729,8 @@ function MapLegend({ legend, layers, features }) {
         backgroundColor: hexToRgba(legend.backgroundColor, legend.backgroundOpacity / 100),
         color: legend.textColor,
         fontFamily: legendFontFamily(legend.fontFamily),
+        border: `${legend.borderWidth}px solid ${hexToRgba(legend.borderColor, legend.borderOpacity / 100)}`,
+        borderRadius: `${legend.borderRadius}px`,
         boxShadow: legend.glowEnabled
           ? `0 0 ${legend.glowSize}px ${legend.glowColor}, 0 5px 18px rgba(0,0,0,.2)`
           : '0 5px 18px rgba(0,0,0,.2)',

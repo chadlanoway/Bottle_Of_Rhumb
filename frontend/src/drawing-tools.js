@@ -2,6 +2,7 @@ import { MaplibreTerradrawControl } from '@watergis/maplibre-gl-terradraw';
 import { TerraDrawSelectMode } from 'terra-draw';
 import { Marker, Popup } from 'maplibre-gl';
 import '@watergis/maplibre-gl-terradraw/dist/maplibre-gl-terradraw.css';
+import { DEFAULT_STYLE, getBasemapStyleDefaults } from './style-defaults.js';
 
 const EMPTY_COLLECTION = {
   type: 'FeatureCollection',
@@ -25,6 +26,12 @@ const DASHED_LINE_LAYER = 'bottle-of-rhumb-dashed-lines';
 const DOTTED_LINE_LAYER = 'bottle-of-rhumb-dotted-lines';
 const DASHED_POLYGON_LAYER = 'bottle-of-rhumb-dashed-polygons';
 const DOTTED_POLYGON_LAYER = 'bottle-of-rhumb-dotted-polygons';
+const FEATURE_GLOW_LINE = 'bottle-of-rhumb-feature-glow-line';
+const FEATURE_GLOW_POLYGON = 'bottle-of-rhumb-feature-glow-polygon';
+const FEATURE_GLOW_POINT = 'bottle-of-rhumb-feature-glow-point';
+const FEATURE_LINE_CASING = 'bottle-of-rhumb-feature-line-casing';
+const FEATURE_LINE_CASING_DASHED = 'bottle-of-rhumb-feature-line-casing-dashed';
+const FEATURE_LINE_CASING_DOTTED = 'bottle-of-rhumb-feature-line-casing-dotted';
 const backgroundMarkerStates = new WeakMap();
 const previewPopups = new WeakMap();
 const selectionIntents = new WeakMap();
@@ -166,7 +173,7 @@ export function createQuickRouteController(map, options = {}) {
   return { arm, cancel, destroy, get active() { return active; } };
 }
 
-export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionChange) {
+export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionChange, basemapId = 'positron') {
   const draw = new MaplibreTerradrawControl({
     modes: ['point', 'linestring', 'polygon', 'circle', 'text', 'select'],
     modeOptions: {
@@ -193,12 +200,13 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
   map.addControl(draw, 'top-right');
 
   const engine = draw.getTerraDrawInstance();
-  ensureTextLayers(map);
+  const styleDefaults = getBasemapStyleDefaults(basemapId);
+  ensureTextLayers(map, styleDefaults.text);
   const keepNativeTextHidden = () => suppressNativeTextLayer(map);
   map.on('styledata', keepNativeTextHidden);
   map.once('remove', () => map.off('styledata', keepNativeTextHidden));
   ensureMultiSelectionLayers(map);
-  ensureFeatureAppearance(map);
+  ensureFeatureAppearance(map, styleDefaults.feature);
   keepPointLayersAbovePolygons(map);
   const pressedSelectionKeys = new Set();
   const selectionKeys = new Set(['Shift', 'Control', 'Meta']);
@@ -446,11 +454,12 @@ export function previewFeaturePopup(draw, map, id, styleDefaults = {}) {
   if (!feature?.properties?.popupEnabled) return;
 
   previewPopups.get(map)?.remove();
-  const popup = new Popup({ closeButton: true, closeOnClick: false, maxWidth: '420px' })
+  const defaults = { ...DEFAULT_STYLE.popup, ...styleDefaults };
+  const popup = new Popup({ closeButton: true, closeOnClick: false, maxWidth: `${Number(feature.properties.popupMaxWidth ?? defaults.maxWidth)}px` })
     .setLngLat(popupCoordinates(feature, map))
     .setDOMContent(buildPopupElement(feature.properties))
     .addTo(map);
-  applyPopupStyle(popup, feature.properties, styleDefaults);
+  applyPopupStyle(popup, feature.properties, defaults);
   previewPopups.set(map, popup);
 }
 
@@ -666,6 +675,33 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
   if (map.getLayer('td-polygon-outline')) {
     map.setFilter('td-polygon-outline', ['all', filter, solidFeatureFilter()]);
   }
+  for (const [layerId, geometryType] of [
+    [FEATURE_GLOW_LINE, 'LineString'],
+    [FEATURE_GLOW_POLYGON, 'Polygon'],
+    [FEATURE_GLOW_POINT, 'Point'],
+  ]) {
+    if (map.getLayer(layerId)) {
+      const defaultGlow = map.rhumbFeatureDefaults?.glowEnabled ?? false;
+      map.setFilter(layerId, [
+        'all',
+        filter,
+        ['==', ['coalesce', ['get', 'featureGlowEnabled'], defaultGlow], true],
+        ['==', ['geometry-type'], geometryType],
+      ]);
+    }
+  }
+  for (const [layerId, dash] of [
+    [FEATURE_LINE_CASING, 'solid'],
+    [FEATURE_LINE_CASING_DASHED, 'dashed'],
+    [FEATURE_LINE_CASING_DOTTED, 'dotted'],
+  ]) {
+    if (map.getLayer(layerId)) {
+      const dashFilter = dash === 'solid'
+        ? solidFeatureFilter()
+        : ['==', ['get', 'featureDash'], dash];
+      map.setFilter(layerId, ['all', filter, ['==', ['geometry-type'], 'LineString'], dashFilter]);
+    }
+  }
   for (const [layerId, geometryType, dash] of [
     [DASHED_LINE_LAYER, 'LineString', 'dashed'],
     [DOTTED_LINE_LAYER, 'LineString', 'dotted'],
@@ -775,46 +811,102 @@ export function addDerivedGeoJSON(draw, collection, layerId) {
   };
 }
 
-function ensureFeatureAppearance(map) {
+function ensureFeatureAppearance(map, defaults) {
+  map.rhumbFeatureDefaults = defaults;
   const color = [
     'case',
     ['==', ['get', 'selected'], true],
     '#ffd166',
-    ['coalesce', ['get', 'featureColor'], '#1e90ff'],
+    ['coalesce', ['get', 'featureColor'], defaults.color],
   ];
-  const opacity = ['/', ['coalesce', ['get', 'featureOpacity'], 100], 100];
+  const opacity = ['/', ['coalesce', ['get', 'featureOpacity'], defaults.opacity], 100];
   const lineWidth = [
     '+',
-    ['coalesce', ['get', 'featureSize'], 3],
+    ['coalesce', ['get', 'featureSize'], defaults.lineWidth],
     ['case', ['==', ['get', 'selected'], true], 2, 0],
   ];
+  const borderColor = ['coalesce', ['get', 'featureBorderColor'], defaults.borderColor];
+  const borderOpacity = ['/', ['coalesce', ['get', 'featureBorderOpacity'], defaults.borderOpacity], 100];
+  const borderWidth = ['coalesce', ['get', 'featureBorderWidth'], defaults.pointBorderWidth];
+  const fillColor = ['coalesce', ['get', 'featureFillColor'], ['get', 'featureColor'], defaults.fillColor];
+  const fillOpacity = ['/', ['coalesce', ['get', 'featureFillOpacity'], defaults.fillOpacity], 100];
 
   setPaint(map, 'td-linestring', 'line-color', color);
   setPaint(map, 'td-linestring', 'line-width', lineWidth);
   setPaint(map, 'td-linestring', 'line-opacity', opacity);
-  setPaint(map, 'td-polygon-outline', 'line-color', color);
-  setPaint(map, 'td-polygon-outline', 'line-width', lineWidth);
-  setPaint(map, 'td-polygon-outline', 'line-opacity', opacity);
-  setPaint(map, 'td-polygon', 'fill-color', color);
-  setPaint(map, 'td-polygon', 'fill-opacity', ['*', opacity, 0.32]);
+  setPaint(map, 'td-polygon-outline', 'line-color', borderColor);
+  setPaint(map, 'td-polygon-outline', 'line-width', ['coalesce', ['get', 'featureBorderWidth'], defaults.polygonBorderWidth]);
+  setPaint(map, 'td-polygon-outline', 'line-opacity', borderOpacity);
+  setPaint(map, 'td-polygon', 'fill-color', fillColor);
+  setPaint(map, 'td-polygon', 'fill-opacity', fillOpacity);
   setPaint(map, 'td-point', 'circle-color', color);
   setPaint(map, 'td-point', 'circle-radius', [
     '+',
-    ['coalesce', ['get', 'featureSize'], 6],
+    ['coalesce', ['get', 'featureSize'], defaults.pointSize],
     ['case', ['==', ['get', 'selected'], true], 2, 0],
   ]);
   setPaint(map, 'td-point', 'circle-opacity', opacity);
-  setPaint(map, 'td-point', 'circle-stroke-color', '#ffffff');
-  setPaint(map, 'td-point', 'circle-stroke-width', 2);
-  setPaint(map, 'td-point', 'circle-stroke-opacity', opacity);
+  setPaint(map, 'td-point', 'circle-stroke-color', borderColor);
+  setPaint(map, 'td-point', 'circle-stroke-width', borderWidth);
+  setPaint(map, 'td-point', 'circle-stroke-opacity', borderOpacity);
 
   const source = map.getStyle().layers.find((layer) => layer.id === 'td-linestring')?.source;
   if (!source) return;
+  ensureFeatureGlowLayers(map, source, defaults);
+  ensureFeatureLineCasingLayers(map, source, defaults, borderColor, borderOpacity);
   const beforeId = map.getLayer(FEATURE_LABEL_LAYER) ? FEATURE_LABEL_LAYER : undefined;
   addDashLayer(map, DASHED_LINE_LAYER, source, 'LineString', 'dashed', [2, 2], color, opacity, lineWidth, beforeId);
   addDashLayer(map, DOTTED_LINE_LAYER, source, 'LineString', 'dotted', [0.25, 1.8], color, opacity, lineWidth, beforeId);
-  addDashLayer(map, DASHED_POLYGON_LAYER, source, 'Polygon', 'dashed', [2, 2], color, opacity, lineWidth, beforeId);
-  addDashLayer(map, DOTTED_POLYGON_LAYER, source, 'Polygon', 'dotted', [0.25, 1.8], color, opacity, lineWidth, beforeId);
+  addDashLayer(map, DASHED_POLYGON_LAYER, source, 'Polygon', 'dashed', [2, 2], borderColor, borderOpacity, ['coalesce', ['get', 'featureBorderWidth'], defaults.polygonBorderWidth], beforeId);
+  addDashLayer(map, DOTTED_POLYGON_LAYER, source, 'Polygon', 'dotted', [0.25, 1.8], borderColor, borderOpacity, ['coalesce', ['get', 'featureBorderWidth'], defaults.polygonBorderWidth], beforeId);
+}
+
+function ensureFeatureLineCasingLayers(map, source, defaults, color, opacity) {
+  const baseWidth = ['coalesce', ['get', 'featureSize'], defaults.lineWidth];
+  const casingWidth = ['+', baseWidth, ['*', ['coalesce', ['get', 'featureBorderWidth'], defaults.lineBorderWidth], 2]];
+  const beforeId = map.getLayer('td-linestring') ? 'td-linestring' : undefined;
+  for (const [id, dash, dashArray] of [
+    [FEATURE_LINE_CASING, 'solid', null],
+    [FEATURE_LINE_CASING_DASHED, 'dashed', [2, 2]],
+    [FEATURE_LINE_CASING_DOTTED, 'dotted', [0.25, 1.8]],
+  ]) {
+    if (map.getLayer(id)) continue;
+    const paint = { 'line-color': color, 'line-width': casingWidth, 'line-opacity': opacity };
+    if (dashArray) paint['line-dasharray'] = dashArray;
+    map.addLayer({
+      id,
+      type: 'line',
+      source,
+      filter: ['all', ['==', ['geometry-type'], 'LineString'], dash === 'solid' ? solidFeatureFilter() : ['==', ['get', 'featureDash'], dash]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint,
+    }, beforeId);
+  }
+}
+
+function ensureFeatureGlowLayers(map, source, defaults) {
+  const enabled = ['==', ['coalesce', ['get', 'featureGlowEnabled'], defaults.glowEnabled], true];
+  const glowColor = ['coalesce', ['get', 'featureGlowColor'], ['get', 'featureColor'], defaults.glowColor];
+  const glowOpacity = ['/', ['coalesce', ['get', 'featureGlowOpacity'], defaults.glowOpacity], 100];
+  const glowSize = ['coalesce', ['get', 'featureGlowSize'], defaults.glowSize];
+  const beforeId = map.getLayer('td-polygon') ? 'td-polygon' : undefined;
+  if (!map.getLayer(FEATURE_GLOW_LINE)) map.addLayer({
+    id: FEATURE_GLOW_LINE, type: 'line', source,
+    filter: ['all', enabled, ['==', ['geometry-type'], 'LineString']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': glowColor, 'line-width': ['+', ['coalesce', ['get', 'featureSize'], defaults.lineWidth], glowSize], 'line-opacity': glowOpacity, 'line-blur': ['/', glowSize, 2] },
+  }, beforeId);
+  if (!map.getLayer(FEATURE_GLOW_POLYGON)) map.addLayer({
+    id: FEATURE_GLOW_POLYGON, type: 'line', source,
+    filter: ['all', enabled, ['==', ['geometry-type'], 'Polygon']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': glowColor, 'line-width': glowSize, 'line-opacity': glowOpacity, 'line-blur': ['/', glowSize, 2] },
+  }, beforeId);
+  if (!map.getLayer(FEATURE_GLOW_POINT)) map.addLayer({
+    id: FEATURE_GLOW_POINT, type: 'circle', source,
+    filter: ['all', enabled, ['==', ['geometry-type'], 'Point']],
+    paint: { 'circle-color': glowColor, 'circle-radius': ['+', ['coalesce', ['get', 'featureSize'], defaults.pointSize], glowSize], 'circle-opacity': glowOpacity, 'circle-blur': 0.65 },
+  }, beforeId);
 }
 
 function addDashLayer(map, id, source, geometryType, dash, dashArray, color, opacity, width, beforeId) {
@@ -966,7 +1058,8 @@ function geometryMode(geometryType) {
   }[geometryType];
 }
 
-function ensureTextLayers(map) {
+function ensureTextLayers(map, defaults) {
+  map.rhumbTextDefaults = defaults;
   if (!map.getSource(TEXT_SOURCE)) {
     map.addSource(TEXT_SOURCE, { type: 'geojson', data: EMPTY_COLLECTION });
   }
@@ -979,14 +1072,14 @@ function ensureTextLayers(map) {
   ];
   const commonLayout = {
     'text-font': fontExpression,
-    'text-size': ['coalesce', ['get', 'textSize'], 16],
+    'text-size': ['coalesce', ['get', 'textSize'], defaults.size],
     'text-allow-overlap': true,
     'text-ignore-placement': true,
   };
   const commonPaint = {
-    'text-color': ['coalesce', ['get', 'textColor'], '#172229'],
-    'text-halo-color': 'rgba(255,255,255,0.88)',
-    'text-halo-width': 1.2,
+    'text-color': ['coalesce', ['get', 'textColor'], defaults.color],
+    'text-halo-color': defaults.haloColor,
+    'text-halo-width': defaults.haloWidth,
   };
 
   map.addLayer({
@@ -1042,6 +1135,7 @@ function suppressNativeTextLayer(map) {
 function syncBackgroundMarkers(map, collection) {
   const state = backgroundMarkerStates.get(map);
   if (!state) return;
+  const defaults = map.rhumbTextDefaults ?? DEFAULT_STYLE.text;
 
   for (const marker of state.markers.values()) marker.remove();
   state.markers.clear();
@@ -1061,12 +1155,12 @@ function syncBackgroundMarkers(map, collection) {
     element.textContent = isFreeText
       ? properties.text || 'Text'
       : properties.labelText || properties.name || '';
-    element.style.color = properties.textColor ?? '#172229';
-    element.style.fontSize = `${properties.textSize ?? 16}px`;
-    element.style.fontFamily = cssFontFamily(properties.textFont);
-    element.style.backgroundColor = properties.backgroundColor ?? '#ffffff';
-    element.style.borderRadius = properties.backgroundRounded === false ? '0' : '7px';
-    element.style.boxShadow = properties.backgroundShadow === false
+    element.style.color = properties.textColor ?? defaults.color;
+    element.style.fontSize = `${properties.textSize ?? defaults.size}px`;
+    element.style.fontFamily = cssFontFamily(properties.textFont ?? defaults.fontFamily);
+    element.style.backgroundColor = properties.backgroundColor ?? defaults.backgroundColor;
+    element.style.borderRadius = (properties.backgroundRounded ?? defaults.backgroundRounded) ? '7px' : '0';
+    element.style.boxShadow = !(properties.backgroundShadow ?? defaults.backgroundShadow)
       ? 'none'
       : '0 3px 10px rgba(0, 0, 0, 0.32)';
     element.addEventListener('click', (event) => {
@@ -1220,13 +1314,17 @@ function getYouTubeEmbedUrl(value) {
 }
 
 function applyPopupStyle(popup, properties, defaults) {
-  const backgroundColor = properties.popupBackgroundColor ?? defaults.backgroundColor ?? '#172229';
-  const opacity = properties.popupBackgroundOpacity ?? defaults.backgroundOpacity ?? 90;
-  const textColor = properties.popupTextColor ?? defaults.textColor ?? '#ffffff';
-  const fontFamily = properties.popupFontFamily ?? defaults.fontFamily ?? 'sans';
-  const glowEnabled = properties.popupGlowEnabled ?? defaults.glowEnabled ?? false;
-  const glowColor = properties.popupGlowColor ?? defaults.glowColor ?? '#1e90ff';
-  const glowSize = properties.popupGlowSize ?? defaults.glowSize ?? 18;
+  const backgroundColor = properties.popupBackgroundColor ?? defaults.backgroundColor;
+  const opacity = properties.popupBackgroundOpacity ?? defaults.backgroundOpacity;
+  const textColor = properties.popupTextColor ?? defaults.textColor;
+  const fontFamily = properties.popupFontFamily ?? defaults.fontFamily;
+  const glowEnabled = properties.popupGlowEnabled ?? defaults.glowEnabled;
+  const glowColor = properties.popupGlowColor ?? defaults.glowColor;
+  const glowSize = properties.popupGlowSize ?? defaults.glowSize;
+  const borderColor = properties.popupBorderColor ?? defaults.borderColor;
+  const borderOpacity = Number(properties.popupBorderOpacity ?? defaults.borderOpacity) / 100;
+  const borderWidth = Number(properties.popupBorderWidth ?? defaults.borderWidth);
+  const borderRadius = Number(properties.popupBorderRadius ?? defaults.borderRadius);
   const background = hexToRgba(backgroundColor, Number(opacity) / 100);
   const element = popup.getElement();
   const content = element?.querySelector('.maplibregl-popup-content');
@@ -1240,6 +1338,8 @@ function applyPopupStyle(popup, properties, defaults) {
   content.style.backgroundColor = background;
   content.style.color = textColor;
   content.style.fontFamily = cssFontFamily(fontFamily);
+  content.style.border = `${borderWidth}px solid ${hexToRgba(borderColor, borderOpacity)}`;
+  content.style.borderRadius = `${borderRadius}px`;
 }
 
 function hexToRgba(hex, alpha) {
@@ -1483,6 +1583,12 @@ export function removeFeatureAppearanceLayers(map) {
     'bottle-of-rhumb-dotted-lines',
     'bottle-of-rhumb-dashed-polygons',
     'bottle-of-rhumb-dotted-polygons',
+    FEATURE_GLOW_LINE,
+    FEATURE_GLOW_POLYGON,
+    FEATURE_GLOW_POINT,
+    FEATURE_LINE_CASING,
+    FEATURE_LINE_CASING_DASHED,
+    FEATURE_LINE_CASING_DOTTED,
   ];
 
   for (const layerId of layerIds) {
