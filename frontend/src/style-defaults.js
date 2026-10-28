@@ -64,7 +64,6 @@ const THEMES = {
     legend: { backgroundColor: '#ead8b8', backgroundOpacity: 96, textColor: '#38291f', fontFamily: 'serif', glowEnabled: false },
     controls: { backgroundColor: '#ead8b8', backgroundOpacity: 97, iconColor: '#38291f', accentColor: '#b7462c', activeTextColor: '#fff7e8', borderColor: '#74523a', borderOpacity: 88, borderWidth: 2, borderRadius: 8, glowEnabled: false },
   },
-
   bright: {
     feature: {
       color: '#1746c7', opacity: 100, pointSize: 9, lineWidth: 5,
