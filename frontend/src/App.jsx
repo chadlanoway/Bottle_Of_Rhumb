@@ -1061,6 +1061,14 @@ export default function App() {
     }
 
     selectFeature(drawRef.current, id, options);
+
+    if (options.focus) {
+      const feature = features.find(
+        (candidate) => String(candidate.id) === String(id),
+      );
+
+      if (feature) fitMapToFeatures(mapRef.current, [feature]);
+    }
   }
 
   function handleSelectionChange(id, { additive = false } = {}) {

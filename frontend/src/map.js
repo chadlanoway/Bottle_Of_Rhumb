@@ -161,7 +161,7 @@ export function fitMapToFeatures(map, features, onComplete) {
   map.once('moveend', () => onComplete?.(getMapView(map)));
 
   if (minLng === maxLng && minLat === maxLat) {
-    map.easeTo({ center: [minLng, minLat], zoom: Math.max(map.getZoom(), 12), duration: 700 });
+    map.easeTo({ center: [minLng, minLat], zoom: 5, duration: 700 });
   } else {
     map.fitBounds(
       [[minLng, minLat], [maxLng, maxLat]],

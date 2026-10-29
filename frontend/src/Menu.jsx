@@ -1236,6 +1236,7 @@ function LayersSection({
 
   function handleFeatureClick(event, featureId, layerFeatures) {
     const ctrlPressed = event.ctrlKey || event.metaKey;
+    const multipleSelection = ctrlPressed || event.shiftKey;
 
     if (event.shiftKey) {
       const anchorId = selectionAnchorRef.current ?? selectedFeatureId;
@@ -1258,7 +1259,10 @@ function LayersSection({
     }
 
     selectionAnchorRef.current = featureId;
-    onSelectFeature(featureId, { additive: ctrlPressed || event.shiftKey });
+    onSelectFeature(featureId, {
+      additive: multipleSelection,
+      focus: !multipleSelection,
+    });
   }
 
   return (
