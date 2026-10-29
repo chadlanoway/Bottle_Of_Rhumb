@@ -247,9 +247,6 @@ export function setupDrawingTools(map, onChange, getActiveLayerId, onSelectionCh
     if (finishedFeature?.properties?.mode === 'text') {
       engine.updateFeatureProperties(id, {
         featureType: 'text',
-        textFont: 'sans',
-        textColor: '#172229',
-        textSize: 16,
       });
     }
     onSelectionChange?.(id, { additive: false });
@@ -1058,26 +1055,44 @@ function geometryMode(geometryType) {
   }[geometryType];
 }
 
+function legacyTextDefaultsExpression() {
+  return [
+    'all',
+    ['!=', ['get', 'textStyleCustomized'], true],
+    ['==', ['get', 'textFont'], 'sans'],
+    ['==', ['downcase', ['to-string', ['get', 'textColor']]], '#172229'],
+    ['==', ['to-number', ['get', 'textSize']], 16],
+  ];
+}
+
+function hasLegacyTextDefaults(properties = {}) {
+  return properties.textStyleCustomized !== true
+    && properties.textFont === 'sans'
+    && String(properties.textColor ?? '').toLowerCase() === '#172229'
+    && Number(properties.textSize) === 16;
+}
+
 function ensureTextLayers(map, defaults) {
   map.rhumbTextDefaults = defaults;
   if (!map.getSource(TEXT_SOURCE)) {
     map.addSource(TEXT_SOURCE, { type: 'geojson', data: EMPTY_COLLECTION });
   }
 
+  const legacyDefaults = legacyTextDefaultsExpression();
   const fontExpression = [
-    'match', ['coalesce', ['get', 'textFont'], 'sans'],
+    'match', ['case', legacyDefaults, defaults.fontFamily, ['coalesce', ['get', 'textFont'], defaults.fontFamily]],
     'serif', ['literal', ['Noto Serif Regular']],
     'mono', ['literal', ['Noto Sans Mono Regular']],
     ['literal', ['Noto Sans Regular']],
   ];
   const commonLayout = {
     'text-font': fontExpression,
-    'text-size': ['coalesce', ['get', 'textSize'], defaults.size],
+    'text-size': ['case', legacyDefaults, defaults.size, ['coalesce', ['get', 'textSize'], defaults.size]],
     'text-allow-overlap': true,
     'text-ignore-placement': true,
   };
   const commonPaint = {
-    'text-color': ['coalesce', ['get', 'textColor'], defaults.color],
+    'text-color': ['case', legacyDefaults, defaults.color, ['coalesce', ['get', 'textColor'], defaults.color]],
     'text-halo-color': defaults.haloColor,
     'text-halo-width': defaults.haloWidth,
   };
@@ -1136,9 +1151,7 @@ function syncBackgroundMarkers(map, collection) {
   const state = backgroundMarkerStates.get(map);
   if (!state) return;
   const defaults = map.rhumbTextDefaults ?? DEFAULT_STYLE.text;
-
-  for (const marker of state.markers.values()) marker.remove();
-  state.markers.clear();
+  const retainedIds = new Set();
 
   for (const feature of collection.features) {
     const properties = feature.properties ?? {};
@@ -1148,33 +1161,106 @@ function syncBackgroundMarkers(map, collection) {
 
     const coordinates = labelCoordinates(feature.geometry);
     if (!coordinates) continue;
+    const featureId = String(feature.id);
+    retainedIds.add(featureId);
+    const isDraggableText = isFreeText && feature.geometry?.type === 'Point';
+    let marker = state.markers.get(featureId);
+    let element = marker?.getElement();
 
-    const element = document.createElement('button');
-    element.type = 'button';
-    element.className = 'map-text-background-marker';
+    if (!marker) {
+      element = document.createElement('button');
+      element.type = 'button';
+      element.className = 'map-text-background-marker';
+      if (isDraggableText) element.classList.add('is-draggable');
+      element.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const currentFeature = state.engine.getSnapshot().find(
+          (candidate) => String(candidate.id) === featureId,
+        );
+        if (currentFeature?.properties?.selected !== true) {
+          state.engine.selectFeature(feature.id);
+        }
+      });
+
+      marker = new Marker({
+        element,
+        anchor: 'center',
+        draggable: isDraggableText,
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      if (isDraggableText) {
+        marker.on('dragstart', () => {
+          marker._rhumbDragging = true;
+          const currentFeature = state.engine.getSnapshot().find(
+            (candidate) => String(candidate.id) === featureId,
+          );
+          if (currentFeature?.properties?.selected === true) {
+            state.engine.deselectFeature(feature.id);
+          }
+        });
+        marker.on('dragend', () => {
+          const { lng, lat } = marker.getLngLat();
+          marker._rhumbDragging = false;
+          state.engine.updateFeatureGeometry(feature.id, {
+            type: 'Point',
+            coordinates: [roundCoordinate(lng), roundCoordinate(lat)],
+          });
+          const updatedFeature = state.engine.getSnapshot().find(
+            (candidate) => String(candidate.id) === featureId,
+          );
+          if (updatedFeature?.properties?.selected !== true) {
+            state.engine.selectFeature(feature.id);
+          }
+        });
+      }
+      state.markers.set(featureId, marker);
+    } else if (!marker._rhumbDragging) {
+      marker.setLngLat(coordinates);
+    }
+
     element.textContent = isFreeText
       ? properties.text || 'Text'
       : properties.labelText || properties.name || '';
-    element.style.color = properties.textColor ?? defaults.color;
-    element.style.fontSize = `${properties.textSize ?? defaults.size}px`;
-    element.style.fontFamily = cssFontFamily(properties.textFont ?? defaults.fontFamily);
-    element.style.backgroundColor = properties.backgroundColor ?? defaults.backgroundColor;
-    element.style.borderRadius = (properties.backgroundRounded ?? defaults.backgroundRounded) ? '7px' : '0';
+    const usesLegacyDefaults = hasLegacyTextDefaults(properties);
+    element.style.color = usesLegacyDefaults ? defaults.color : properties.textColor ?? defaults.color;
+    element.style.fontSize = `${usesLegacyDefaults ? defaults.size : properties.textSize ?? defaults.size}px`;
+    element.style.fontFamily = cssFontFamily(
+      usesLegacyDefaults ? defaults.fontFamily : properties.textFont ?? defaults.fontFamily,
+    );
+    const backgroundOpacity = Number(properties.backgroundOpacity ?? defaults.backgroundOpacity) / 100;
+    const borderOpacity = Number(properties.backgroundBorderOpacity ?? defaults.backgroundBorderOpacity) / 100;
+    const borderWidth = Number(properties.backgroundBorderWidth ?? defaults.backgroundBorderWidth);
+    const borderRadius = Number(
+      properties.backgroundBorderRadius
+      ?? (properties.backgroundRounded === false ? 0 : defaults.backgroundBorderRadius),
+    );
+    element.style.backgroundColor = hexToRgba(
+      properties.backgroundColor ?? defaults.backgroundColor,
+      backgroundOpacity,
+    );
+    element.style.border = `${borderWidth}px solid ${hexToRgba(
+      properties.backgroundBorderColor ?? defaults.backgroundBorderColor,
+      borderOpacity,
+    )}`;
+    element.style.borderRadius = `${borderRadius}px`;
     element.style.boxShadow = !(properties.backgroundShadow ?? defaults.backgroundShadow)
       ? 'none'
       : '0 3px 10px rgba(0, 0, 0, 0.32)';
-    element.addEventListener('click', (event) => {
-      event.stopPropagation();
-      state.engine.selectFeature(feature.id);
-    });
+  }
 
-    const marker = new Marker({ element, anchor: 'center' })
-      .setLngLat(coordinates)
-      .addTo(map);
-    state.markers.set(String(feature.id), marker);
+  for (const [featureId, marker] of state.markers) {
+    if (retainedIds.has(featureId)) continue;
+    marker.remove();
+    state.markers.delete(featureId);
   }
 
   updateBackgroundMarkerVisibility(state, collection);
+}
+
+function roundCoordinate(value) {
+  return Number(Number(value).toFixed(9));
 }
 
 function updateBackgroundMarkerVisibility(state, collection) {

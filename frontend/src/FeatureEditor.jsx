@@ -30,8 +30,14 @@ const RESERVED_PROPERTIES = new Set([
   'textFont',
   'textColor',
   'textSize',
+  'textStyleCustomized',
   'textBackground',
   'backgroundColor',
+  'backgroundOpacity',
+  'backgroundBorderColor',
+  'backgroundBorderOpacity',
+  'backgroundBorderWidth',
+  'backgroundBorderRadius',
   'backgroundRounded',
   'backgroundShadow',
   'popupEnabled',
@@ -816,6 +822,20 @@ function isYouTubeUrl(value) {
 function TextControls({ defaults, feature, isTextFeature, onUpdate }) {
   const properties = feature.properties ?? {};
   const enabled = isTextFeature || properties.labelEnabled === true;
+  const backgroundOpacity = properties.backgroundOpacity ?? defaults.backgroundOpacity;
+  const backgroundBorderColor = properties.backgroundBorderColor ?? defaults.backgroundBorderColor;
+  const backgroundBorderOpacity = properties.backgroundBorderOpacity ?? defaults.backgroundBorderOpacity;
+  const backgroundBorderWidth = properties.backgroundBorderWidth ?? defaults.backgroundBorderWidth;
+  const backgroundBorderRadius = properties.backgroundBorderRadius
+    ?? (properties.backgroundRounded === false ? 0 : defaults.backgroundBorderRadius);
+
+  const usesLegacyDefaults = properties.textStyleCustomized !== true
+    && properties.textFont === 'sans'
+    && String(properties.textColor ?? '').toLowerCase() === '#172229'
+    && Number(properties.textSize) === 16;
+  const resolvedFont = usesLegacyDefaults ? defaults.fontFamily : properties.textFont ?? defaults.fontFamily;
+  const resolvedColor = usesLegacyDefaults ? defaults.color : properties.textColor ?? defaults.color;
+  const resolvedSize = usesLegacyDefaults ? defaults.size : properties.textSize ?? defaults.size;
 
   return (
     <div className="text-controls">
@@ -846,8 +866,8 @@ function TextControls({ defaults, feature, isTextFeature, onUpdate }) {
             <label>
               <span className="field-label">Font</span>
               <select
-                value={properties.textFont ?? defaults.fontFamily}
-                onChange={(event) => onUpdate({ textFont: event.target.value })}
+                value={resolvedFont}
+                onChange={(event) => onUpdate({ textFont: event.target.value, textStyleCustomized: true })}
               >
                 {FONT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -859,8 +879,8 @@ function TextControls({ defaults, feature, isTextFeature, onUpdate }) {
               <input
                 className="color-input"
                 type="color"
-                value={properties.textColor ?? defaults.color}
-                onChange={(event) => onUpdate({ textColor: event.target.value })}
+                value={resolvedColor}
+                onChange={(event) => onUpdate({ textColor: event.target.value, textStyleCustomized: true })}
               />
             </label>
             <label>
@@ -871,10 +891,10 @@ function TextControls({ defaults, feature, isTextFeature, onUpdate }) {
                   min="10"
                   max="40"
                   step="1"
-                  value={properties.textSize ?? defaults.size}
-                  onChange={(event) => onUpdate({ textSize: Number(event.target.value) })}
+                  value={resolvedSize}
+                  onChange={(event) => onUpdate({ textSize: Number(event.target.value), textStyleCustomized: true })}
                 />
-                <output>{properties.textSize ?? defaults.size}px</output>
+                <output>{resolvedSize}px</output>
               </div>
             </label>
           </div>
@@ -890,22 +910,52 @@ function TextControls({ defaults, feature, isTextFeature, onUpdate }) {
 
             {properties.textBackground === true && (
               <div className="background-options">
-                <label>
-                  <span className="field-label">Background color</span>
-                  <input
-                    className="color-input"
-                    type="color"
-                    value={properties.backgroundColor ?? defaults.backgroundColor}
-                    onChange={(event) => onUpdate({ backgroundColor: event.target.value })}
-                  />
+                <div className="text-background-color-grid">
+                  <label>
+                    <span className="field-label">Background</span>
+                    <input
+                      className="color-input"
+                      type="color"
+                      value={properties.backgroundColor ?? defaults.backgroundColor}
+                      onChange={(event) => onUpdate({ backgroundColor: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    <span className="field-label">Border</span>
+                    <input
+                      className="color-input"
+                      type="color"
+                      value={backgroundBorderColor}
+                      onChange={(event) => onUpdate({ backgroundBorderColor: event.target.value })}
+                    />
+                  </label>
+                </div>
+                <label className="legend-range-field">
+                  <span>Background opacity</span>
+                  <input type="range" min="0" max="100" step="1" value={backgroundOpacity}
+                    onChange={(event) => onUpdate({ backgroundOpacity: Number(event.target.value) })} />
+                  <output>{backgroundOpacity}%</output>
                 </label>
-                <label className="toggle-field compact-toggle">
-                  <input
-                    type="checkbox"
-                    checked={properties.backgroundRounded ?? defaults.backgroundRounded}
-                    onChange={(event) => onUpdate({ backgroundRounded: event.target.checked })}
-                  />
-                  <span>Rounded corners</span>
+                <label className="legend-range-field">
+                  <span>Border width</span>
+                  <input type="range" min="0" max="8" step="1" value={backgroundBorderWidth}
+                    onChange={(event) => onUpdate({ backgroundBorderWidth: Number(event.target.value) })} />
+                  <output>{backgroundBorderWidth}px</output>
+                </label>
+                <label className="legend-range-field">
+                  <span>Border opacity</span>
+                  <input type="range" min="0" max="100" step="1" value={backgroundBorderOpacity}
+                    onChange={(event) => onUpdate({ backgroundBorderOpacity: Number(event.target.value) })} />
+                  <output>{backgroundBorderOpacity}%</output>
+                </label>
+                <label className="legend-range-field">
+                  <span>Corner radius</span>
+                  <input type="range" min="0" max="30" step="1" value={backgroundBorderRadius}
+                    onChange={(event) => {
+                      const radius = Number(event.target.value);
+                      onUpdate({ backgroundBorderRadius: radius, backgroundRounded: radius > 0 });
+                    }} />
+                  <output>{backgroundBorderRadius}px</output>
                 </label>
                 <label className="toggle-field compact-toggle">
                   <input
