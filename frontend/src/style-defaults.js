@@ -34,20 +34,41 @@ const COMMON = {
 const THEMES = {
   positron: {
     feature: {
-      color: '#0067c5', opacity: 96, pointSize: 7, lineWidth: 4,
+      color: '#0067c5', opacity: 90, pointSize: 7, lineWidth: 4,
       fillColor: '#4eb7e8', fillOpacity: 24,
       borderColor: '#f8fbff', borderOpacity: 100,
       pointBorderWidth: 2, lineBorderWidth: 2, polygonBorderWidth: 3,
-      glowEnabled: false, glowColor: '#53c7ff', glowSize: 8, glowOpacity: 28,
+      glowEnabled: true, glowColor: '#e8f4f8', glowSize: 6, glowOpacity: 18,
     },
     popup: {
-      backgroundColor: '#152b38', backgroundOpacity: 96, textColor: '#f5fbff',
+      backgroundColor: '#f7fbfd', backgroundOpacity: 90, textColor: '#102d3a',
       borderColor: '#63b9d7', borderOpacity: 72, borderWidth: 1,
-      borderRadius: 5, maxWidth: 400, glowEnabled: false, glowColor: '#4eb7e8', glowSize: 12,
+      borderRadius: 5, maxWidth: 400,
+      glowEnabled: true, glowColor: '#17242c', glowSize: 7,
     },
-    text: { color: '#102d3a', size: 16, haloColor: '#ffffff', haloWidth: 1.6, backgroundColor: '#f7fbfd', backgroundOpacity: 94, backgroundBorderColor: '#63b9d7', backgroundBorderOpacity: 72, backgroundBorderWidth: 1, backgroundBorderRadius: 5 },
-    legend: { backgroundColor: '#f7fbfd', backgroundOpacity: 94, textColor: '#102d3a', borderColor: '#63b9d7', borderOpacity: 72, borderWidth: 1, borderRadius: 5, glowEnabled: false },
-    controls: { backgroundColor: '#f7fbfd', backgroundOpacity: 94, iconColor: '#102d3a', accentColor: '#0067c5', activeTextColor: '#f7fbfd', borderColor: '#63b9d7', borderOpacity: 72, borderWidth: 1, borderRadius: 24, glowEnabled: false },
+    text: {
+      color: '#102d3a', size: 16,
+      haloColor: '#ffffff', haloWidth: 1.6,
+      backgroundColor: '#f7fbfd', backgroundOpacity: 84,
+      backgroundBorderColor: '#63b9d7', backgroundBorderOpacity: 82,
+      backgroundBorderWidth: 1, backgroundBorderRadius: 5,
+      glowEnabled: true, glowColor: '#17242c', glowSize: 7,
+    },
+    legend: {
+      backgroundColor: '#f7fbfd', backgroundOpacity: 80,
+      textColor: '#102d3a',
+      borderColor: '#63b9d7', borderOpacity: 72,
+      borderWidth: 1, borderRadius: 5,
+      glowEnabled: true, glowColor: '#17242c', glowSize: 6,
+    },
+    controls: {
+      backgroundColor: '#f7fbfd', backgroundOpacity: 80,
+      iconColor: '#102d3a', accentColor: '#0067c5',
+      activeTextColor: '#f7fbfd',
+      borderColor: '#63b9d7', borderOpacity: 82,
+      borderWidth: 1, borderRadius: 24,
+      glowEnabled: true, glowColor: '#17242c', glowSize: 6,
+    },
   },
 
   liberty: {
@@ -76,13 +97,13 @@ const THEMES = {
       glowEnabled: false, glowColor: '#ffd740', glowSize: 12, glowOpacity: 35,
     },
     popup: {
-      backgroundColor: '#fff4b8', backgroundOpacity: 98, textColor: '#17375e',
-      borderColor: '#1746c7', borderOpacity: 100, borderWidth: 3,
-      borderRadius: 12, maxWidth: 440, glowEnabled: false, glowColor: '#ffc400', glowSize: 9,
+      backgroundColor: '#d9f2ff', backgroundOpacity: 86, textColor: '#0b3558',
+      borderColor: '#43a6d5', borderOpacity: 88, borderWidth: 2,
+      borderRadius: 14, maxWidth: 440, glowEnabled: true, glowColor: '#85ddff', glowSize: 14,
     },
-    text: { color: '#17375e', size: 17, haloColor: '#ffffff', haloWidth: 2, backgroundColor: '#fff4b8', backgroundOpacity: 98, backgroundBorderColor: '#1746c7', backgroundBorderOpacity: 100, backgroundBorderWidth: 3, backgroundBorderRadius: 12 },
-    legend: { backgroundColor: '#fff4b8', backgroundOpacity: 97, textColor: '#17375e', glowEnabled: false, glowColor: '#ffc400', glowSize: 9 },
-    controls: { backgroundColor: '#fff4b8', backgroundOpacity: 98, iconColor: '#17375e', accentColor: '#1746c7', activeTextColor: '#ffffff', borderColor: '#1746c7', borderOpacity: 100, borderWidth: 3, borderRadius: 18, glowEnabled: false, glowColor: '#ffc400', glowSize: 9 },
+    text: { color: '#0b3558', size: 17, haloColor: '#f4fbff', haloWidth: 2, backgroundColor: '#d9f2ff', backgroundOpacity: 82, backgroundBorderColor: '#43a6d5', backgroundBorderOpacity: 90, backgroundBorderWidth: 2, backgroundBorderRadius: 12 },
+    legend: { backgroundColor: '#d9f2ff', backgroundOpacity: 82, textColor: '#0b3558', borderColor: '#43a6d5', borderOpacity: 88, borderWidth: 2, borderRadius: 14, glowEnabled: true, glowColor: '#85ddff', glowSize: 14 },
+    controls: { backgroundColor: '#d9f2ff', backgroundOpacity: 80, iconColor: '#0b3558', accentColor: '#1687c9', activeTextColor: '#ffffff', borderColor: '#43a6d5', borderOpacity: 88, borderWidth: 2, borderRadius: 20, glowEnabled: true, glowColor: '#85ddff', glowSize: 14 },
   },
 
   dark: {
@@ -240,11 +261,11 @@ const THEMES = {
     popup: {
       backgroundColor: '#1a1029', backgroundOpacity: 88, textColor: '#fff4ff',
       borderColor: '#2bfff1', borderOpacity: 100, borderWidth: 2,
-      borderRadius: 24, maxWidth: 500, glowEnabled: true, glowColor: '#ff3cac', glowSize: 32,
+      borderRadius: 24, maxWidth: 500, glowEnabled: false, glowColor: '#ff3cac', glowSize: 32,
     },
     text: { color: '#fff4ff', size: 18, haloColor: '#12091f', haloWidth: 2.8, backgroundColor: '#1a1029', backgroundOpacity: 94, backgroundBorderColor: '#2bfff1', backgroundBorderOpacity: 100, backgroundBorderWidth: 2, backgroundBorderRadius: 24 },
-    legend: { backgroundColor: '#1a1029', backgroundOpacity: 86, textColor: '#fff4ff', glowEnabled: true, glowColor: '#ff3cac', glowSize: 30 },
-    controls: { backgroundColor: '#1a1029', backgroundOpacity: 88, iconColor: '#2bfff1', accentColor: '#ff3cac', activeTextColor: '#ffffff', borderColor: '#2bfff1', borderOpacity: 100, borderWidth: 2, borderRadius: 30, glowEnabled: true, glowColor: '#ff3cac', glowSize: 28 },
+    legend: { backgroundColor: '#1a1029', backgroundOpacity: 86, textColor: '#fff4ff', glowEnabled: false, glowColor: '#ff3cac', glowSize: 30 },
+    controls: { backgroundColor: '#1a1029', backgroundOpacity: 88, iconColor: '#2bfff1', accentColor: '#ff3cac', activeTextColor: '#ffffff', borderColor: '#2bfff1', borderOpacity: 100, borderWidth: 2, borderRadius: 30, glowEnabled: false, glowColor: '#ff3cac', glowSize: 28 },
   },
 };
 

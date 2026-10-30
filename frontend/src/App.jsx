@@ -1555,10 +1555,31 @@ export default function App() {
   const selectedFeatures = selectedFeatureIds
     .map((id) => features.find((feature) => String(feature.id) === String(id)))
     .filter(Boolean);
+  const editorThemeStyle = {
+    '--editor-panel-background': hexToRgba(
+      legend.backgroundColor,
+      legend.backgroundOpacity / 100,
+    ),
+    '--editor-panel-color': legend.textColor,
+    '--editor-panel-muted': hexToRgba(legend.textColor, 0.72),
+    '--editor-panel-soft': hexToRgba(legend.textColor, 0.09),
+    '--editor-panel-hover': hexToRgba(legend.textColor, 0.15),
+    '--editor-panel-border': hexToRgba(
+      legend.borderColor,
+      legend.borderOpacity / 100,
+    ),
+    '--editor-panel-border-width': `${legend.borderWidth}px`,
+    '--editor-panel-radius': `${legend.borderRadius}px`,
+    '--editor-panel-font': legendFontFamily(legend.fontFamily),
+    '--editor-panel-shadow': legend.glowEnabled
+      ? `0 0 ${legend.glowSize}px ${legend.glowColor}, 0 14px 38px rgba(0,0,0,.35)`
+      : '0 14px 38px rgba(0,0,0,.35)',
+  };
 
   return (
     <main
       className={`app-shell ${dragActive ? 'is-dragging-file' : ''} ${viewerMode ? 'is-viewer' : ''} ${embedMode ? 'is-embed' : ''}`}
+      style={editorThemeStyle}
       onDragEnter={viewerMode ? undefined : handleDragEnter}
       onDragLeave={viewerMode ? undefined : handleDragLeave}
       onDragOver={viewerMode ? undefined : handleDragOver}

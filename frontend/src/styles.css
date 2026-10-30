@@ -567,10 +567,13 @@ select:focus-visible {
   left: 12px;
   width: min(330px, calc(100vw - 24px));
   overflow: hidden;
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  background: var(--panel);
-  box-shadow: 0 14px 38px rgba(0, 0, 0, .35);
+  border: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
+  border-radius: var(--editor-panel-radius, 8px);
+  background: var(--editor-panel-background, var(--panel));
+  color: var(--editor-panel-color, #eef5f8);
+  box-shadow: var(--editor-panel-shadow, 0 14px 38px rgba(0, 0, 0, .35));
+  backdrop-filter: blur(7px);
+  font-family: var(--editor-panel-font, inherit);
   transition: width 180ms ease;
 }
 
@@ -585,7 +588,7 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: 6px;
-  border-bottom: 1px solid var(--panel-border);
+  border-bottom: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
 }
 
 .panel-heading strong {
@@ -600,8 +603,8 @@ select:focus-visible {
   place-items: center;
   border: 0;
   border-radius: 5px;
-  background: rgba(255, 255, 255, .09);
-  color: white;
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .09));
+  color: var(--editor-panel-color, white);
   cursor: pointer;
   font-size: 22px;
 }
@@ -609,7 +612,7 @@ select:focus-visible {
 .menu-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-bottom: 1px solid var(--panel-border);
+  border-bottom: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
 }
 
 .menu-tabs button {
@@ -617,7 +620,7 @@ select:focus-visible {
   border: 0;
   border-bottom: 3px solid transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
@@ -627,8 +630,8 @@ select:focus-visible {
 
 .menu-tabs button:hover,
 .menu-tabs button.is-active {
-  border-bottom-color: var(--blue);
-  color: white;
+  border-bottom-color: var(--editor-panel-color, var(--blue));
+  color: var(--editor-panel-color, white);
 }
 
 .menu-section {
@@ -640,7 +643,7 @@ select:focus-visible {
 
 .section-label {
   margin: 2px 0 8px;
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .11em;
@@ -777,7 +780,7 @@ select:focus-visible {
 .field-label {
   display: block;
   margin: 9px 0 4px;
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   font-size: 12px;
 }
 
@@ -786,10 +789,10 @@ select:focus-visible {
 .feature-editor textarea,
 .feature-editor select {
   width: 100%;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
   border-radius: 5px;
-  background: #0e181d;
-  color: white;
+  background: var(--editor-panel-soft, #0e181d);
+  color: var(--editor-panel-color, white);
   padding: 7px 8px;
 }
 
@@ -875,17 +878,19 @@ select:focus-visible {
   gap: 7px;
   padding: 7px 13px;
   transform: translateX(-50%);
-  border: 1px solid var(--panel-border);
-  border-radius: 22px;
-  background: var(--panel);
-  color: white;
-  box-shadow: 0 8px 26px rgba(0, 0, 0, .42);
+  border: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
+  border-radius: var(--editor-panel-radius, 22px);
+  background: var(--editor-panel-background, var(--panel));
+  color: var(--editor-panel-color, white);
+  box-shadow: var(--editor-panel-shadow, 0 8px 26px rgba(0, 0, 0, .42));
+  backdrop-filter: blur(7px);
+  font-family: var(--editor-panel-font, inherit);
   cursor: pointer;
   font-weight: 700;
 }
 
 .feature-editor-toggle>span:first-child {
-  color: var(--green);
+  color: var(--editor-panel-color, var(--green));
   font-size: 21px;
 }
 
@@ -897,10 +902,13 @@ select:focus-visible {
   width: min(480px, calc(100vw - 32px));
   overflow: hidden;
   transform: translateX(-50%);
-  border: 1px solid var(--panel-border);
-  border-radius: 9px;
-  background: var(--panel);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, .48);
+  border: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
+  border-radius: var(--editor-panel-radius, 9px);
+  background: var(--editor-panel-background, var(--panel));
+  color: var(--editor-panel-color, #eef5f8);
+  box-shadow: var(--editor-panel-shadow, 0 16px 44px rgba(0, 0, 0, .48));
+  backdrop-filter: blur(7px);
+  font-family: var(--editor-panel-font, inherit);
 }
 
 .feature-editor-heading {
@@ -925,7 +933,7 @@ select:focus-visible {
 }
 
 .feature-editor-eyebrow {
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .11em;
@@ -963,8 +971,8 @@ select:focus-visible {
   height: 32px;
   border: 0;
   border-radius: 5px;
-  background: rgba(255, 255, 255, .08);
-  color: white;
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .08));
+  color: var(--editor-panel-color, white);
   cursor: pointer;
   font-size: 21px;
 }
@@ -972,8 +980,8 @@ select:focus-visible {
 .feature-editor-tabs {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  border-top: 1px solid var(--panel-border);
-  border-bottom: 1px solid var(--panel-border);
+  border-top: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
+  border-bottom: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
 }
 
 .feature-editor-tabs.is-multi {
@@ -985,7 +993,7 @@ select:focus-visible {
   border: 0;
   border-bottom: 3px solid transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
@@ -995,8 +1003,8 @@ select:focus-visible {
 
 .feature-editor-tabs button:hover,
 .feature-editor-tabs button.is-active {
-  border-bottom-color: var(--blue);
-  color: white;
+  border-bottom-color: var(--editor-panel-color, var(--blue));
+  color: var(--editor-panel-color, white);
 }
 
 .feature-editor-body {
@@ -1555,8 +1563,8 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-top: 1px solid var(--panel-border);
-  color: var(--muted);
+  border-top: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, var(--panel-border));
+  color: var(--editor-panel-muted, var(--muted));
   font-size: 12px;
 }
 
@@ -2114,6 +2122,119 @@ button:disabled {
   border-radius: 5px;
   background: #0e181d;
   cursor: pointer;
+}
+
+/* Keep both editing surfaces visually tied to the live legend theme. */
+.app-menu .layer-card,
+.app-menu .legend-appearance-fieldset,
+.app-menu .view-not-saved,
+.app-menu .saved-view-card {
+  border-color: var(--editor-panel-border, var(--panel-border));
+  background-color: var(--editor-panel-soft, rgba(255, 255, 255, .04));
+}
+
+.app-menu .layer-details,
+.app-menu .map-settings-divider {
+  border-color: var(--editor-panel-border, var(--panel-border));
+}
+
+.app-menu .map-settings-divider {
+  background: var(--editor-panel-border, var(--panel-border));
+}
+
+.app-menu :is(
+  input:not([type='color']):not([type='range']):not([type='checkbox']):not([type='radio']),
+  textarea,
+  select,
+  .geojson-editor
+) {
+  border-color: var(--editor-panel-border, var(--panel-border));
+  background: var(--editor-panel-soft, #0e181d);
+  color: var(--editor-panel-color, white);
+}
+
+.app-menu :is(input, textarea)::placeholder,
+.feature-editor :is(input, textarea)::placeholder {
+  color: var(--editor-panel-muted, var(--muted));
+  opacity: 1;
+}
+
+.app-menu :is(
+  .layer-row,
+  .layer-select-button,
+  .visibility-button,
+  .feature-list button,
+  .small-button,
+  .secondary-button,
+  .geojson-editor-actions button,
+  .apply-geojson-button,
+  .saved-view-actions button,
+  .legend-master-toggle,
+  .legend-range-field,
+  .legend-glow-toggle
+) {
+  color: var(--editor-panel-color, white);
+}
+
+.app-menu :is(
+  .small-button,
+  .secondary-button,
+  .geojson-editor-actions button,
+  .saved-view-actions button
+) {
+  border-color: var(--editor-panel-border, var(--panel-border));
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .08));
+}
+
+.app-menu :is(
+  .section-help,
+  .data-drop-help,
+  .empty-message,
+  .empty-section p,
+  .view-not-saved,
+  .basemap-description,
+  .legend-help,
+  .legend-appearance-fieldset legend,
+  .legend-range-field output,
+  .layer-count,
+  .saved-view-card dt,
+  .basemap-preview
+) {
+  color: var(--editor-panel-muted, var(--muted));
+}
+
+.app-menu .basemap-preview:hover:not(:disabled),
+.app-menu .basemap-preview.is-selected {
+  color: var(--editor-panel-color, white);
+}
+
+.app-menu .feature-list button:hover,
+.app-menu .visibility-button:hover,
+.app-menu .icon-button:hover,
+.feature-editor .editor-collapse-button:hover {
+  background: var(--editor-panel-hover, rgba(255, 255, 255, .14));
+  color: var(--editor-panel-color, white);
+}
+
+.feature-editor :is(
+  .property-column-labels,
+  .appearance-help,
+  .background-help,
+  .popup-help
+) {
+  color: var(--editor-panel-muted, var(--muted));
+}
+
+.feature-editor .multi-select-help {
+  border-top-color: var(--editor-panel-border, var(--panel-border));
+  background: var(--editor-panel-soft, rgba(255, 209, 102, .075));
+  color: var(--editor-panel-color, #dce6ea);
+}
+
+.feature-editor .multi-select-help kbd {
+  border-color: var(--editor-panel-border, rgba(255, 255, 255, .25));
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .08));
+  color: var(--editor-panel-color, white);
 }
 
 .map-legend {
