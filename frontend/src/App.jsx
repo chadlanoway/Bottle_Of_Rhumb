@@ -55,6 +55,12 @@ import {
   updateMap as updateSavedMap,
 } from './map-storage.js';
 import { DEFAULT_STYLE, getBasemapStyleDefaults } from './style-defaults.js';
+import {
+  DEFAULT_LAYER_VISUALIZATION,
+  drawingHiddenLayerIds,
+  removeLayerVisualizations,
+  syncLayerVisualizations,
+} from './layer-visualization.js';
 
 const LEGEND_COLORS = ['#1e90ff', '#e06c5b', '#45a36f', '#9b72cf', '#d49a36', '#2ba6a6'];
 
@@ -66,6 +72,7 @@ function makeLayer(id, name, index = 0) {
     showInLegend: true,
     legendLabel: name,
     legendColor: LEGEND_COLORS[index % LEGEND_COLORS.length],
+    visualization: { ...DEFAULT_LAYER_VISUALIZATION },
   };
 }
 
@@ -138,9 +145,9 @@ export default function App() {
   const embedMode = query.get('embed') === '1';
 
   useEffect(() => {
-    const hiddenLayerIds = layers
-      .filter((layer) => !layer.visible)
-      .map((layer) => layer.id);
+    const hiddenLayerIds = drawingHiddenLayerIds(layers);
+    setHiddenLayers(drawRef.current, mapRef.current, hiddenLayerIds);
+    syncLayerVisualizations(mapRef.current, layers, features, layers[0]?.id);
     mapRef.current?.rhumbWeatherControl?.setFeatures(
       features,
       hiddenLayerIds,
@@ -302,6 +309,7 @@ export default function App() {
 
       if (mapRef.current) {
         removeFeatureAppearanceLayers(mapRef.current);
+        removeLayerVisualizations(mapRef.current);
         mapRef.current.remove();
       }
     };
@@ -363,10 +371,9 @@ export default function App() {
         );
       }
 
-      const hiddenLayerIds = restoredLayers
-        .filter((layer) => !layer.visible)
-        .map((layer) => layer.id);
+      const hiddenLayerIds = drawingHiddenLayerIds(restoredLayers);
       setHiddenLayers(draw, map, hiddenLayerIds);
+      syncLayerVisualizations(map, restoredLayers, restoredFeatures, restoredLayers[0]?.id);
 
       const restoredPrimary = restoredSelection?.at?.(-1) ?? restoredSelection ?? null;
       if (restoredPrimary !== null && restoredPrimary !== undefined) {
@@ -806,7 +813,13 @@ export default function App() {
         layerId,
       );
       const name = spatialFileLayerName(file.name);
-      setLayers((current) => [...current, makeLayer(layerId, name, current.length)]);
+      setLayers((current) => {
+        const importedLayer = makeLayer(layerId, name, current.length);
+        if (collection.importReport?.type === 'csv') {
+          importedLayer.importReport = collection.importReport;
+        }
+        return [...current, importedLayer];
+      });
       setActiveLayerId(layerId);
       setSelectedFeatureIds([]);
       setFeatures(loaded.features);
@@ -1010,7 +1023,7 @@ export default function App() {
     }
     const file = files.find(isSupportedSpatialFile);
     if (!file) {
-      setError('Drop a JPEG, PNG, WebP, GeoJSON, KML, or GPX file onto the map.');
+      setError('Drop a JPEG, PNG, WebP, GeoJSON, CSV, KML, or GPX file onto the map.');
       return;
     }
     await handleImport(file);
@@ -1100,8 +1113,7 @@ export default function App() {
       const next = current.map((layer) => (
         layer.id === id ? { ...layer, visible: !layer.visible } : layer
       ));
-      const hiddenIds = next.filter((layer) => !layer.visible).map((layer) => layer.id);
-      setHiddenLayers(drawRef.current, mapRef.current, hiddenIds);
+      setHiddenLayers(drawRef.current, mapRef.current, drawingHiddenLayerIds(next));
       return next;
     });
   }
@@ -1183,7 +1195,7 @@ export default function App() {
     setHiddenLayers(
       drawRef.current,
       mapRef.current,
-      nextLayers.filter((candidate) => !candidate.visible).map((candidate) => candidate.id),
+      drawingHiddenLayerIds(nextLayers),
     );
   }
 
@@ -1254,6 +1266,7 @@ export default function App() {
     searchMarkerRef.current = null;
     mapRef.current.rhumbWeatherControl?.disableWeather();
     removeFeatureAppearanceLayers(mapRef.current);
+    removeLayerVisualizations(mapRef.current);
     mapRef.current.remove();
     drawRef.current = null;
     mapRef.current = null;
@@ -1296,6 +1309,22 @@ export default function App() {
     setLayers((current) => current.map((layer) => (
       layer.id === id ? { ...layer, ...changes } : layer
     )));
+  }
+
+  function handleLayerVisualizationChange(id, changes) {
+    setLayers((current) => current.map((layer) => (
+      layer.id === id
+        ? {
+          ...layer,
+          visualization: {
+            ...DEFAULT_LAYER_VISUALIZATION,
+            ...(layer.visualization ?? {}),
+            ...changes,
+          },
+        }
+        : layer
+    )));
+    setSelectedFeatureIds([]);
   }
 
   function buildSavedDocument() {
@@ -1543,7 +1572,7 @@ export default function App() {
       setHiddenLayers(
         drawRef.current,
         mapRef.current,
-        nextLayers.filter((layer) => !layer.visible).map((layer) => layer.id),
+        drawingHiddenLayerIds(nextLayers),
       );
     }
   }
@@ -1667,6 +1696,7 @@ export default function App() {
         onDeleteFeature={handleDeleteFeatureById}
         onDuplicateFeature={handleDuplicateFeature}
         onLayerChange={setActiveLayerId}
+        onLayerVisualizationChange={handleLayerVisualizationChange}
         onLegendChange={handleLegendChange}
         onMapControlsChange={handleMapControlsChange}
         onLegendLayerChange={handleLegendLayerChange}
@@ -1719,7 +1749,7 @@ export default function App() {
         <div className="geojson-drop-overlay" aria-hidden="true">
           <div>
             <strong>Drop a map file or photo</strong>
-            <span>GeoJSON, KML, GPX, JPEG, PNG, or WebP</span>
+            <span>GeoJSON, CSV, KML, GPX, JPEG, PNG, or WebP</span>
           </div>
         </div>
       )}

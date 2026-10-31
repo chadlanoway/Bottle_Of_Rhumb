@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { FaGithub } from 'react-icons/fa';
+import {
+  layerSupportsPointVisualization,
+  layerVisualization,
+  numericFieldsForLayer,
+} from './layer-visualization.js';
 
 const DRAW_ACTIONS = [
   { type: 'select', label: 'Select', icon: '↖' },
@@ -340,6 +345,7 @@ export default function Menu({
   onImport,
   onFitToFeatures,
   onLayerChange,
+  onLayerVisualizationChange,
   onLegendChange,
   onMapControlsChange,
   onLegendLayerChange,
@@ -420,6 +426,7 @@ export default function Menu({
               onDeleteFeature={onDeleteFeature}
               onDuplicateFeature={onDuplicateFeature}
               onLayerChange={onLayerChange}
+              onLayerVisualizationChange={onLayerVisualizationChange}
               onReorderLayer={onReorderLayer}
               onRenameLayer={onRenameLayer}
               onSelectFeature={onSelectFeature}
@@ -751,14 +758,14 @@ function DataSection({
         ref={fileInputRef}
         className="visually-hidden"
         type="file"
-        accept=".geojson,.json,.kml,.gpx,application/geo+json,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml"
+        accept=".geojson,.json,.kml,.gpx,.csv,text/csv,application/geo+json,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml"
         onChange={onFileChange}
       />
       <div className="button-row">
         <button className="secondary-button" disabled={disabled} type="button" onClick={() => fileInputRef.current?.click()}>Import layer</button>
         <button className="secondary-button" disabled={disabled || features.length === 0} type="button" onClick={onExport}>Export</button>
       </div>
-      <p className="data-drop-help">You can also drop a GeoJSON, KML, or GPX file directly onto the map.</p>
+      <p className="data-drop-help">Import or drop GeoJSON, CSV, KML, or GPX. CSV files currently require latitude and longitude columns.</p>
 
       <div className="map-settings-divider" />
       <p className="section-label">GeoJSON editor</p>
@@ -1150,6 +1157,7 @@ function LayersSection({
   onDeleteFeature,
   onDuplicateFeature,
   onLayerChange,
+  onLayerVisualizationChange,
   onReorderLayer,
   onRenameLayer,
   onSelectFeature,
@@ -1374,6 +1382,13 @@ function LayersSection({
           const layerHasSelection = layerFeatures.some(
             (feature) => selectedIds.has(String(feature.id)),
           );
+          const visualization = layerVisualization(layer);
+          const supportsPointVisualization = layerSupportsPointVisualization(
+            features,
+            layer.id,
+            layers[0]?.id,
+          );
+          const numericFields = numericFieldsForLayer(features, layer.id, layers[0]?.id);
 
           return (
             <section
@@ -1431,6 +1446,96 @@ function LayersSection({
                 <div className="layer-details">
                   <label className="field-label" htmlFor={`layer-${layer.id}`}>Layer name</label>
                   <input id={`layer-${layer.id}`} value={layer.name} onChange={(event) => onRenameLayer(layer.id, event.target.value)} />
+
+                  <p className="section-label layer-visualization-label">Visualization</p>
+                  <div className="layer-visualization-options" role="group" aria-label={`Visualization for ${layer.name}`}>
+                    {[
+                      ['symbols', 'Symbols'],
+                      ['clusters', 'Clusters'],
+                      ['heatmap', 'Heat map'],
+                    ].map(([type, label]) => {
+                      const unavailable = type !== 'symbols' && !supportsPointVisualization;
+                      return (
+                        <button
+                          className={visualization.type === type ? 'is-active' : ''}
+                          disabled={unavailable}
+                          key={type}
+                          type="button"
+                          title={unavailable ? 'This visualization requires a point-only layer.' : `Display as ${label.toLowerCase()}`}
+                          onClick={() => onLayerVisualizationChange(layer.id, { type })}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {visualization.type === 'heatmap' && supportsPointVisualization && (
+                    <div className="visualization-settings">
+                      <label className="field-label" htmlFor={`heat-weight-${layer.id}`}>Weight field</label>
+                      <select
+                        id={`heat-weight-${layer.id}`}
+                        value={visualization.weightField}
+                        onChange={(event) => onLayerVisualizationChange(layer.id, { weightField: event.target.value })}
+                      >
+                        <option value="">Count every point equally</option>
+                        {numericFields.map((field) => <option key={field} value={field}>{field}</option>)}
+                      </select>
+                      <RangeSetting
+                        id={`heat-radius-${layer.id}`}
+                        label="Radius"
+                        min="5"
+                        max="60"
+                        step="1"
+                        suffix=" px"
+                        value={visualization.heatRadius}
+                        onChange={(heatRadius) => onLayerVisualizationChange(layer.id, { heatRadius })}
+                      />
+                      <RangeSetting
+                        id={`heat-intensity-${layer.id}`}
+                        label="Intensity"
+                        min="0.2"
+                        max="3"
+                        step="0.1"
+                        value={visualization.heatIntensity}
+                        onChange={(heatIntensity) => onLayerVisualizationChange(layer.id, { heatIntensity })}
+                      />
+                      <RangeSetting
+                        id={`heat-opacity-${layer.id}`}
+                        label="Opacity"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={visualization.heatOpacity}
+                        onChange={(heatOpacity) => onLayerVisualizationChange(layer.id, { heatOpacity })}
+                      />
+                    </div>
+                  )}
+
+                  {visualization.type === 'clusters' && supportsPointVisualization && (
+                    <div className="visualization-settings">
+                      <RangeSetting
+                        id={`cluster-radius-${layer.id}`}
+                        label="Cluster radius"
+                        min="20"
+                        max="100"
+                        step="5"
+                        suffix=" px"
+                        value={visualization.clusterRadius}
+                        onChange={(clusterRadius) => onLayerVisualizationChange(layer.id, { clusterRadius })}
+                      />
+                      <p className="visualization-help">Click a cluster on the map to expand it. Switch back to Symbols to edit individual points.</p>
+                    </div>
+                  )}
+
+                  {layer.importReport?.type === 'csv' && (
+                    <p className="csv-import-summary">
+                      Imported {layer.importReport.importedRows.toLocaleString()} of {layer.importReport.totalRows.toLocaleString()} CSV rows
+                      {layer.importReport.skippedRowCount > 0
+                        ? `; skipped ${layer.importReport.skippedRowCount} invalid row${layer.importReport.skippedRowCount === 1 ? '' : 's'}.`
+                        : '.'}
+                    </p>
+                  )}
                   <p className="section-label feature-list-label">Features</p>
                   {layerFeatures.length === 0 ? (
                     <p className="empty-message">Use the toolbar to draw the first feature.</p>
@@ -1489,6 +1594,24 @@ function LayersSection({
       )}
 
     </div>
+  );
+}
+
+function RangeSetting({ id, label, min, max, step, suffix = '', value, onChange }) {
+  return (
+    <label className="visualization-range" htmlFor={id}>
+      <span>{label}</span>
+      <output>{Number(value).toFixed(Number(step) < 1 ? 2 : 0)}{suffix}</output>
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
   );
 }
 

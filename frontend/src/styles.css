@@ -777,6 +777,94 @@ select:focus-visible {
   border-top: 1px solid var(--panel-border);
 }
 
+.layer-visualization-label {
+  margin-top: 14px;
+}
+
+.layer-visualization-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.layer-visualization-options button {
+  min-width: 0;
+  padding: 7px 5px;
+  border: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, #536b78);
+  border-radius: 6px;
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .08));
+  color: var(--editor-panel-color, #eef5f8);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.layer-visualization-options button:hover:not(:disabled),
+.layer-visualization-options button:focus-visible {
+  background: var(--editor-panel-hover, rgba(255, 255, 255, .15));
+  outline: none;
+}
+
+.layer-visualization-options button.is-active {
+  border-color: var(--rhumb-control-accent, #2395ff);
+  background: var(--rhumb-control-accent, #2395ff);
+  color: var(--rhumb-control-active-text, #fff);
+}
+
+.layer-visualization-options button:disabled {
+  cursor: not-allowed;
+  opacity: .38;
+}
+
+.visualization-settings {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: var(--editor-panel-border-width, 1px) solid var(--editor-panel-border, #536b78);
+  border-radius: 8px;
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .07));
+}
+
+.visualization-settings select {
+  width: 100%;
+}
+
+.visualization-range {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  align-items: center;
+  color: var(--editor-panel-color, #eef5f8);
+  font-size: 12px;
+}
+
+.visualization-range output {
+  color: var(--editor-panel-muted, #a8bbc4);
+  font-variant-numeric: tabular-nums;
+}
+
+.visualization-range input {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.visualization-help,
+.csv-import-summary {
+  margin: 0;
+  color: var(--editor-panel-muted, #a8bbc4);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.csv-import-summary {
+  margin-top: 10px;
+  padding: 8px 9px;
+  border-left: 3px solid var(--rhumb-control-accent, #2395ff);
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .07));
+}
+
 .field-label {
   display: block;
   margin: 9px 0 4px;
