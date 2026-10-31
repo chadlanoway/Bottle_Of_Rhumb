@@ -3,6 +3,7 @@ import { FaGithub } from 'react-icons/fa';
 import {
   CHOROPLETH_RAMPS,
   buildChoroplethClasses,
+  choroplethNormalizationReport,
   layerSupportsPolygonVisualization,
   layerSupportsPointVisualization,
   layerVisualization,
@@ -1389,6 +1390,7 @@ function LayersSection({
           );
           const numericFields = numericFieldsForLayer(features, layer.id, layers[0]?.id);
           const choroplethPreview = buildChoroplethClasses(layerFeatures, visualization);
+          const choroplethReport = choroplethNormalizationReport(layerFeatures, visualization);
 
           return (
             <section
@@ -1541,11 +1543,93 @@ function LayersSection({
                       <select
                         id={`choropleth-field-${layer.id}`}
                         value={visualization.choroplethField}
-                        onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethField: event.target.value })}
+                        onChange={(event) => {
+                          const choroplethField = event.target.value;
+                          onLayerVisualizationChange(layer.id, {
+                            choroplethField,
+                            ...(visualization.choroplethDenominatorField === choroplethField
+                              ? { choroplethDenominatorField: '' }
+                              : {}),
+                          });
+                        }}
                       >
                         <option value="">Choose a field…</option>
                         {numericFields.map((field) => <option key={field} value={field}>{field}</option>)}
                       </select>
+
+                      <label className="field-label" htmlFor={`choropleth-normalization-${layer.id}`}>Normalize values</label>
+                      <select
+                        id={`choropleth-normalization-${layer.id}`}
+                        value={visualization.choroplethNormalization}
+                        onChange={(event) => {
+                          const choroplethNormalization = event.target.value;
+                          onLayerVisualizationChange(layer.id, {
+                            choroplethNormalization,
+                            ...(choroplethNormalization === 'z-score' ? { choroplethRamp: 'diverging' } : {}),
+                          });
+                        }}
+                      >
+                        <option value="none">None — use raw values</option>
+                        <option value="field">Divide by another field / rate</option>
+                        <option value="percent-total">Percent of layer total</option>
+                        <option value="area">Density by geodesic area</option>
+                        <option value="z-score">Z-score</option>
+                      </select>
+
+                      {visualization.choroplethNormalization === 'field' && (
+                        <div className="choropleth-normalization-box">
+                          <label>
+                            <span className="field-label">Denominator field</span>
+                            <select
+                              value={visualization.choroplethDenominatorField}
+                              onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethDenominatorField: event.target.value })}
+                            >
+                              <option value="">Choose a denominator…</option>
+                              {numericFields
+                                .filter((field) => field !== visualization.choroplethField)
+                                .map((field) => <option key={field} value={field}>{field}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            <span className="field-label">Rate multiplier</span>
+                            <select
+                              value={visualization.choroplethRateScale}
+                              onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethRateScale: Number(event.target.value) })}
+                            >
+                              <option value="1">Ratio (per 1)</option>
+                              <option value="100">Percent (per 100)</option>
+                              <option value="1000">Per 1,000</option>
+                              <option value="10000">Per 10,000</option>
+                              <option value="100000">Per 100,000</option>
+                            </select>
+                          </label>
+                        </div>
+                      )}
+
+                      {visualization.choroplethNormalization === 'area' && (
+                        <label>
+                          <span className="field-label">Area unit</span>
+                          <select
+                            value={visualization.choroplethAreaUnit}
+                            onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethAreaUnit: event.target.value })}
+                          >
+                            <option value="square-kilometers">Per square kilometer</option>
+                            <option value="square-miles">Per square mile</option>
+                          </select>
+                        </label>
+                      )}
+
+                      {visualization.choroplethField && (
+                        <div className={`choropleth-report ${choroplethReport.excludedCount > 0 ? 'has-warning' : ''}`}>
+                          <strong>{choroplethReport.formula}</strong>
+                          <span>
+                            {choroplethReport.validCount.toLocaleString()} mapped
+                            {choroplethReport.excludedCount > 0
+                              ? `; ${choroplethReport.excludedCount.toLocaleString()} excluded for missing, zero, or invalid values.`
+                              : '; no features excluded.'}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="choropleth-setting-grid">
                         <label>

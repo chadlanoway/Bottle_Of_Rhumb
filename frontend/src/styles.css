@@ -841,6 +841,37 @@ select:focus-visible {
   gap: 8px;
 }
 
+.choropleth-normalization-box {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
+  border-radius: 6px;
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .05));
+}
+
+.choropleth-report {
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border-left: 3px solid var(--green, #79d59b);
+  border-radius: 4px;
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .05));
+  color: var(--editor-panel-muted, var(--muted));
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.choropleth-report strong {
+  color: var(--editor-panel-color, white);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.choropleth-report.has-warning {
+  border-left-color: #e7b85a;
+}
+
 .choropleth-setting-grid label,
 .choropleth-ramp-row {
   min-width: 0;

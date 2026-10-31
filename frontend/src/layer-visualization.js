@@ -10,6 +10,10 @@ export const DEFAULT_LAYER_VISUALIZATION = Object.freeze({
   clusterRadius: 50,
   clusterMaxZoom: 14,
   choroplethField: '',
+  choroplethNormalization: 'none',
+  choroplethDenominatorField: '',
+  choroplethRateScale: 1,
+  choroplethAreaUnit: 'square-kilometers',
   choroplethMethod: 'quantile',
   choroplethClasses: 5,
   choroplethRamp: 'blues',
@@ -75,10 +79,8 @@ export function layerSupportsPolygonVisualization(features, layerId, fallbackLay
 export function buildChoroplethClasses(features, visualization) {
   const field = visualization?.choroplethField;
   if (!field) return [];
-  const values = (features ?? [])
-    .map((feature) => feature.properties?.[field])
-    .filter(Number.isFinite)
-    .sort((a, b) => a - b);
+  const analysis = analyzeChoroplethValues(features, visualization);
+  const values = analysis.values.map((entry) => entry.value).sort((a, b) => a - b);
   if (values.length === 0) return [];
 
   const requested = clamp(Math.round(Number(visualization.choroplethClasses) || 5), 3, 7);
@@ -100,8 +102,23 @@ export function buildChoroplethClasses(features, visualization) {
     color,
     minimum: boundaries[index],
     maximum: boundaries[index + 1],
-    label: formatClassRange(boundaries[index], boundaries[index + 1], index === colors.length - 1),
+    label: formatClassRange(
+      boundaries[index],
+      boundaries[index + 1],
+      index === colors.length - 1,
+      analysis.unit,
+    ),
   }));
+}
+
+export function choroplethNormalizationReport(features, visualization) {
+  const analysis = analyzeChoroplethValues(features, visualization);
+  return {
+    validCount: analysis.values.length,
+    excludedCount: (features ?? []).length - analysis.values.length,
+    formula: analysis.formula,
+    unit: analysis.unit,
+  };
 }
 
 export function syncLayerVisualizations(map, layers, features, fallbackLayerId = 'default-layer') {
@@ -152,19 +169,32 @@ function syncChoropleth(map, layer, polygonFeatures, visualization) {
   const outlineId = `${PREFIX}${id}-choropleth-outline`;
   removeVisualizationType(map, id, 'heat');
   removeVisualizationType(map, id, 'cluster');
-  setGeoJsonSource(map, sourceId, polygonFeatures, null);
+  const analysis = analyzeChoroplethValues(polygonFeatures, visualization);
+  const renderedFeatures = polygonFeatures.map((feature, index) => ({
+    ...feature,
+    properties: {
+      ...feature.properties,
+      __rhumbChoroplethValue: analysis.byIndex.get(index) ?? null,
+    },
+  }));
+  setGeoJsonSource(map, sourceId, renderedFeatures, null);
 
   const classes = buildChoroplethClasses(polygonFeatures, visualization);
   if (classes.length === 0) {
     removeVisualizationType(map, id, 'choropleth');
     return;
   }
-  const field = visualization.choroplethField;
+  const field = '__rhumbChoroplethValue';
   const step = ['step', ['to-number', ['get', field]], classes[0].color];
   for (let index = 1; index < classes.length; index += 1) {
     step.push(classes[index].minimum, classes[index].color);
   }
-  const fillColor = ['case', ['has', field], step, visualization.choroplethNoDataColor];
+  const fillColor = [
+    'case',
+    ['all', ['has', field], ['!=', ['get', field], null]],
+    step,
+    visualization.choroplethNoDataColor,
+  ];
   const fillPaint = {
     'fill-color': fillColor,
     'fill-opacity': Number(visualization.choroplethOpacity),
@@ -469,12 +499,112 @@ function sampleColors(colors, count) {
   ));
 }
 
-function formatClassRange(minimum, maximum, finalClass) {
-  const format = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-  if (minimum === maximum) return format.format(minimum);
+function analyzeChoroplethValues(features, visualization) {
+  const source = features ?? [];
+  const field = visualization?.choroplethField;
+  const mode = visualization?.choroplethNormalization || 'none';
+  const denominatorField = visualization?.choroplethDenominatorField;
+  const rateScale = Number(visualization?.choroplethRateScale) || 1;
+  const raw = source.map((feature, index) => ({
+    feature,
+    index,
+    value: feature.properties?.[field],
+  })).filter((entry) => Number.isFinite(entry.value));
+  const byIndex = new Map();
+  let formula = field || 'Value';
+  let unit = '';
+
+  if (mode === 'field') {
+    for (const entry of raw) {
+      const denominator = entry.feature.properties?.[denominatorField];
+      if (!Number.isFinite(denominator) || denominator <= 0) continue;
+      byIndex.set(entry.index, (entry.value / denominator) * rateScale);
+    }
+    formula = `${field} ÷ ${denominatorField}${rateScale === 1 ? '' : ` × ${formatCompact(rateScale)}`}`;
+    unit = rateScale === 100 ? '%' : rateScale === 1 ? '' : ` per ${formatCompact(rateScale)}`;
+  } else if (mode === 'percent-total') {
+    const total = raw.reduce((sum, entry) => sum + entry.value, 0);
+    if (Number.isFinite(total) && total !== 0) {
+      for (const entry of raw) byIndex.set(entry.index, (entry.value / total) * 100);
+    }
+    formula = `${field} ÷ layer total × 100`;
+    unit = '%';
+  } else if (mode === 'z-score') {
+    const mean = raw.reduce((sum, entry) => sum + entry.value, 0) / Math.max(raw.length, 1);
+    const variance = raw.reduce((sum, entry) => sum + ((entry.value - mean) ** 2), 0) / Math.max(raw.length, 1);
+    const deviation = Math.sqrt(variance);
+    for (const entry of raw) byIndex.set(entry.index, deviation === 0 ? 0 : (entry.value - mean) / deviation);
+    formula = `(${field} − mean) ÷ standard deviation`;
+    unit = ' z';
+  } else if (mode === 'area') {
+    const squareMiles = visualization?.choroplethAreaUnit === 'square-miles';
+    for (const entry of raw) {
+      const squareKilometers = geometryAreaSquareKilometers(entry.feature.geometry);
+      const area = squareMiles ? squareKilometers * 0.3861021585 : squareKilometers;
+      if (!Number.isFinite(area) || area <= 0) continue;
+      byIndex.set(entry.index, entry.value / area);
+    }
+    formula = `${field} ÷ geodesic area`;
+    unit = squareMiles ? ' per mi²' : ' per km²';
+  } else {
+    for (const entry of raw) byIndex.set(entry.index, entry.value);
+  }
+
+  const values = [...byIndex.entries()]
+    .map(([index, value]) => ({ index, value }))
+    .filter((entry) => Number.isFinite(entry.value));
+  return { values, byIndex, formula, unit };
+}
+
+function geometryAreaSquareKilometers(geometry) {
+  if (!geometry || !['Polygon', 'MultiPolygon'].includes(geometry.type)) return NaN;
+  const polygons = geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+  const squareMeters = polygons.reduce((total, polygon) => {
+    if (!polygon?.length) return total;
+    const outer = Math.abs(sphericalRingArea(polygon[0]));
+    const holes = polygon.slice(1).reduce((sum, ring) => sum + Math.abs(sphericalRingArea(ring)), 0);
+    return total + Math.max(0, outer - holes);
+  }, 0);
+  return squareMeters / 1_000_000;
+}
+
+function sphericalRingArea(coordinates) {
+  if (!Array.isArray(coordinates) || coordinates.length < 3) return 0;
+  const radius = 6_371_008.8;
+  let sum = 0;
+  for (let index = 0; index < coordinates.length; index += 1) {
+    const current = coordinates[index];
+    const next = coordinates[(index + 1) % coordinates.length];
+    const latitude1 = degreesToRadians(current[1]);
+    const latitude2 = degreesToRadians(next[1]);
+    let longitudeDelta = degreesToRadians(next[0] - current[0]);
+    if (longitudeDelta > Math.PI) longitudeDelta -= Math.PI * 2;
+    if (longitudeDelta < -Math.PI) longitudeDelta += Math.PI * 2;
+    sum += longitudeDelta * (2 + Math.sin(latitude1) + Math.sin(latitude2));
+  }
+  return (sum * radius * radius) / 2;
+}
+
+function degreesToRadians(value) {
+  return (Number(value) * Math.PI) / 180;
+}
+
+function formatClassRange(minimum, maximum, finalClass, unit = '') {
+  if (minimum === maximum) return `${formatChoroplethNumber(minimum)}${unit}`;
   return finalClass
-    ? `${format.format(minimum)} – ${format.format(maximum)}`
-    : `${format.format(minimum)} – < ${format.format(maximum)}`;
+    ? `${formatChoroplethNumber(minimum)} – ${formatChoroplethNumber(maximum)}${unit}`
+    : `${formatChoroplethNumber(minimum)} – < ${formatChoroplethNumber(maximum)}${unit}`;
+}
+
+function formatChoroplethNumber(value) {
+  const absolute = Math.abs(value);
+  return new Intl.NumberFormat(undefined, absolute > 0 && absolute < 1
+    ? { maximumSignificantDigits: 4 }
+    : { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatCompact(value) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
 }
 
 function clamp(value, minimum, maximum) {

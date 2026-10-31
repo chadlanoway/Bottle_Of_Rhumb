@@ -1,0 +1,14 @@
+{
+  "type": "FeatureCollection",
+  "name": "Phase 3 normalization sample",
+  "features": [
+    {"type":"Feature","id":"norm-01","properties":{"name":"District 1","cases":18,"population":12000,"households":4700},"geometry":{"type":"Polygon","coordinates":[[[-90.0,43.0],[-89.75,43.0],[-89.75,43.2],[-90.0,43.2],[-90.0,43.0]]]}},
+    {"type":"Feature","id":"norm-02","properties":{"name":"District 2","cases":42,"population":18000,"households":7200},"geometry":{"type":"Polygon","coordinates":[[[-89.7,43.0],[-89.45,43.0],[-89.45,43.2],[-89.7,43.2],[-89.7,43.0]]]}},
+    {"type":"Feature","id":"norm-03","properties":{"name":"District 3","cases":75,"population":52000,"households":20100},"geometry":{"type":"Polygon","coordinates":[[[-89.4,43.0],[-89.15,43.0],[-89.15,43.2],[-89.4,43.2],[-89.4,43.0]]]}},
+    {"type":"Feature","id":"norm-04","properties":{"name":"District 4","cases":64,"population":25000,"households":9800},"geometry":{"type":"Polygon","coordinates":[[[-89.1,43.0],[-88.85,43.0],[-88.85,43.2],[-89.1,43.2],[-89.1,43.0]]]}},
+    {"type":"Feature","id":"norm-05","properties":{"name":"District 5","cases":110,"population":86000,"households":33400},"geometry":{"type":"Polygon","coordinates":[[[-90.0,42.75],[-89.75,42.75],[-89.75,42.95],[-90.0,42.95],[-90.0,42.75]]]}},
+    {"type":"Feature","id":"norm-06","properties":{"name":"District 6","cases":29,"population":9500,"households":3900},"geometry":{"type":"Polygon","coordinates":[[[-89.7,42.75],[-89.45,42.75],[-89.45,42.95],[-89.7,42.95],[-89.7,42.75]]]}},
+    {"type":"Feature","id":"norm-07","properties":{"name":"Zero denominator","cases":15,"population":0,"households":0},"geometry":{"type":"Polygon","coordinates":[[[-89.4,42.75],[-89.15,42.75],[-89.15,42.95],[-89.4,42.95],[-89.4,42.75]]]}},
+    {"type":"Feature","id":"norm-08","properties":{"name":"Missing denominator","cases":37,"households":14000},"geometry":{"type":"Polygon","coordinates":[[[-89.1,42.75],[-88.85,42.75],[-88.85,42.95],[-89.1,42.95],[-89.1,42.75]]]}}
+  ]
+}
