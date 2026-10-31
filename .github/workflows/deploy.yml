@@ -43,6 +43,7 @@ jobs:
           VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
           VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
           VITE_WATER_ROUTING_API_URL: ${{ vars.VITE_WATER_ROUTING_API_URL }}
+          VITE_GEOCODING_API_URL: ${{ vars.VITE_GEOCODING_API_URL }}
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

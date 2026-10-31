@@ -2443,6 +2443,52 @@ button:disabled {
   animation: spin 1.6s linear infinite;
 }
 
+.data-import-status {
+  position: absolute;
+  z-index: 42;
+  top: 88px;
+  left: 50%;
+  display: flex;
+  max-width: min(520px, calc(100vw - 32px));
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .3);
+}
+
+.data-import-status-spinner {
+  color: var(--blue);
+  font-size: 20px;
+  animation: spin 1.6s linear infinite;
+}
+
+.data-import-status button {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.geocoding-attribution {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.geocoding-attribution a {
+  color: var(--blue);
+}
+
 .error-banner {
   bottom: 20px;
   display: flex;

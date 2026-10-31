@@ -90,17 +90,11 @@ function queueVisualizationSync(map, layers, features, fallbackLayerId) {
 
   const request = { layers, features, fallbackLayerId };
   pendingVisualizationSyncs.set(map, request);
-
   map.once('idle', () => {
     const latest = pendingVisualizationSyncs.get(map);
     if (!latest) return;
     pendingVisualizationSyncs.delete(map);
-    syncLayerVisualizations(
-      map,
-      latest.layers,
-      latest.features,
-      latest.fallbackLayerId,
-    );
+    syncLayerVisualizations(map, latest.layers, latest.features, latest.fallbackLayerId);
   });
 }
 

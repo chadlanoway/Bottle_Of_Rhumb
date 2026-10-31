@@ -46,6 +46,7 @@ import {
   readSpatialFile,
   spatialFileLayerName,
 } from './file-import.js';
+import { geocodeCsvAddresses } from './csv-geocoding.js';
 import { initializeAuth, signIn, signOut } from './auth.js';
 import {
   createMap as createSavedMap,
@@ -104,6 +105,7 @@ export default function App() {
   const [savedView, setSavedView] = useState(null);
   const [viewMessage, setViewMessage] = useState('');
   const [error, setError] = useState('');
+  const [dataImportStatus, setDataImportStatus] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [basemapId, setBasemapId] = useState('positron');
   const [projection, setProjection] = useState('globe');
@@ -804,7 +806,14 @@ export default function App() {
   async function handleImport(file) {
     try {
       setError('');
-      const collection = await readSpatialFile(file);
+      setDataImportStatus(`Reading ${file.name}…`);
+      const collection = await readSpatialFile(file, {
+        geocodeAddresses: (addresses) => geocodeCsvAddresses(
+          addresses,
+          authSession?.accessToken,
+          setDataImportStatus,
+        ),
+      });
       const layerId = `layer-${crypto.randomUUID()}`;
       const loaded = addGeoJSON(
         drawRef.current,
@@ -823,8 +832,13 @@ export default function App() {
       setActiveLayerId(layerId);
       setSelectedFeatureIds([]);
       setFeatures(loaded.features);
+      const geocoded = collection.importReport?.coordinateSource === 'geoapify';
+      setDataImportStatus(geocoded
+        ? `Added ${collection.importReport.importedRows.toLocaleString()} geocoded CSV rows.`
+        : 'Layer imported.');
       return { ok: true };
     } catch (caughtError) {
+      setDataImportStatus('');
       setError(caughtError.message);
       return { ok: false, error: caughtError.message };
     }
@@ -1758,6 +1772,14 @@ export default function App() {
         <div className="loading-card" role="status">
           <div className="loading-compass">⌖</div>
           <span>Loading chart…</span>
+        </div>
+      )}
+
+      {dataImportStatus && mapReady && !error && (
+        <div className="data-import-status" role="status">
+          <span className="data-import-status-spinner" aria-hidden="true">⌖</span>
+          <span>{dataImportStatus}</span>
+          <button type="button" aria-label="Dismiss import status" onClick={() => setDataImportStatus('')}>×</button>
         </div>
       )}
 

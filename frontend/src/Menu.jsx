@@ -765,7 +765,10 @@ function DataSection({
         <button className="secondary-button" disabled={disabled} type="button" onClick={() => fileInputRef.current?.click()}>Import layer</button>
         <button className="secondary-button" disabled={disabled || features.length === 0} type="button" onClick={onExport}>Export</button>
       </div>
-      <p className="data-drop-help">Import or drop GeoJSON, CSV, KML, or GPX. CSV files currently require latitude and longitude columns.</p>
+      <p className="data-drop-help">Import or drop GeoJSON, CSV, KML, or GPX. CSV files may use latitude/longitude or address columns. Address geocoding requires sign-in.</p>
+      <p className="geocoding-attribution">
+        Address geocoding powered by <a href="https://www.geoapify.com/" target="_blank" rel="noreferrer">Geoapify</a>.
+      </p>
 
       <div className="map-settings-divider" />
       <p className="section-label">GeoJSON editor</p>
@@ -1531,6 +1534,7 @@ function LayersSection({
                   {layer.importReport?.type === 'csv' && (
                     <p className="csv-import-summary">
                       Imported {layer.importReport.importedRows.toLocaleString()} of {layer.importReport.totalRows.toLocaleString()} CSV rows
+                      {layer.importReport.coordinateSource === 'geoapify' ? ' using Geoapify' : ''}
                       {layer.importReport.skippedRowCount > 0
                         ? `; skipped ${layer.importReport.skippedRowCount} invalid row${layer.importReport.skippedRowCount === 1 ? '' : 's'}.`
                         : '.'}
