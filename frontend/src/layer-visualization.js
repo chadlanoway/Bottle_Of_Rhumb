@@ -1,4 +1,5 @@
 const PREFIX = 'rhumb-visualization-';
+const pendingVisualizationSyncs = new WeakMap();
 
 export const DEFAULT_LAYER_VISUALIZATION = Object.freeze({
   type: 'symbols',
@@ -47,7 +48,12 @@ export function layerSupportsPointVisualization(features, layerId, fallbackLayer
 }
 
 export function syncLayerVisualizations(map, layers, features, fallbackLayerId = 'default-layer') {
-  if (!map?.isStyleLoaded?.()) return;
+  if (!map?.isStyleLoaded?.()) {
+    queueVisualizationSync(map, layers, features, fallbackLayerId);
+    return;
+  }
+
+  pendingVisualizationSyncs.delete(map);
 
   const activeIds = new Set();
   for (const layer of layers ?? []) {
@@ -69,6 +75,33 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
   }
 
   removeInactiveVisualizations(map, activeIds);
+}
+
+function queueVisualizationSync(map, layers, features, fallbackLayerId) {
+  if (!map?.once) return;
+
+  const pending = pendingVisualizationSyncs.get(map);
+  if (pending) {
+    pending.layers = layers;
+    pending.features = features;
+    pending.fallbackLayerId = fallbackLayerId;
+    return;
+  }
+
+  const request = { layers, features, fallbackLayerId };
+  pendingVisualizationSyncs.set(map, request);
+
+  map.once('idle', () => {
+    const latest = pendingVisualizationSyncs.get(map);
+    if (!latest) return;
+    pendingVisualizationSyncs.delete(map);
+    syncLayerVisualizations(
+      map,
+      latest.layers,
+      latest.features,
+      latest.fallbackLayerId,
+    );
+  });
 }
 
 export function removeLayerVisualizations(map) {
