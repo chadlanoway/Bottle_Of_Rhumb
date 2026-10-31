@@ -7,16 +7,24 @@ import {
 } from './layer-visualization.js';
 
 const DRAW_ACTIONS = [
-  { type: 'select', label: 'Select', icon: '↖' },
-  { type: 'point', label: 'Point', icon: '●' },
-  { type: 'line', label: 'Line', icon: '╱' },
-  { type: 'polygon', label: 'Polygon', icon: '⬡' },
-  { type: 'text', label: 'Text', icon: 'T' },
-  { type: 'circle', label: 'Circle', icon: '○' },
-  { type: 'quick-route', label: 'Quick route', icon: '⤳' },
-  { type: 'water-route', label: 'Water autoroute', icon: '≈' },
-  { type: 'land-route', label: 'Land route', icon: '⇢' },
+  { type: 'select', label: 'Select', icon: '↖', help: 'Select, move, and edit existing features.' },
+  { type: 'point', label: 'Point', icon: '●', help: 'Place a point on the map.' },
+  { type: 'line', label: 'Line', icon: '╱', help: 'Draw a line one vertex at a time.' },
+  { type: 'polygon', label: 'Polygon', icon: '⬡', help: 'Draw an enclosed area on the map.' },
+  { type: 'text', label: 'Text', icon: 'T', help: 'Place editable text on the map.' },
+  { type: 'circle', label: 'Circle', icon: '○', help: 'Draw a circle from its center and radius.' },
+  { type: 'my-location', label: 'My location', icon: '◎', help: "Place a point on the map at your device's location." },
+  { type: 'quick-route', label: 'Quick route', icon: '⤳', help: 'Place two points, then adjust the automatic line connecting them.' },
+  { type: 'water-route', label: 'Water autoroute', icon: '≈', help: 'Create an editable water route that avoids land.' },
+  { type: 'land-route', label: 'Land route', icon: '⇢', help: 'Create a walking, hiking, cycling, or driving route.' },
 ];
+
+const EDITOR_TAB_HELP = {
+  layers: 'Manage layers, features, visibility, order, and map visualization.',
+  map: 'Set the opening view, basemap, projection, legend, and map controls.',
+  data: 'Import, inspect, edit, validate, and export map data.',
+  share: 'Sign in, save, publish, reopen, and share your maps.',
+};
 
 const ROUTE_PROFILES = [
   { value: 'foot-walking', label: 'Walking' },
@@ -112,14 +120,12 @@ export function EditorToolbar({
   onCancelRouting,
   onDraw,
   onPreviewSearchResult,
-  onSetView,
   onStartRouting,
   onStartQuickRoute,
   onStartWaterRoute,
   onUseSearchAsRouteStart,
   routingActive,
   routingStatus,
-  viewSaved,
   tutorialDrawMenuOpen = false,
 }) {
   const [drawMenuOpen, setDrawMenuOpen] = useState(false);
@@ -159,6 +165,7 @@ export function EditorToolbar({
     if (type === 'land-route') onStartRouting(routeProfile);
     else if (type === 'water-route') onStartWaterRoute();
     else if (type === 'quick-route') onStartQuickRoute();
+    else if (type === 'my-location') locateDevice();
     else onDraw(type);
   }
 
@@ -193,6 +200,7 @@ export function EditorToolbar({
           disabled={disabled}
           type="button"
           aria-expanded={drawMenuOpen}
+          title="Choose a drawing, location, or routing tool"
           onClick={() => setDrawMenuOpen((value) => !value)}
         >
           <span aria-hidden="true">✎</span>
@@ -207,6 +215,8 @@ export function EditorToolbar({
                 key={action.type}
                 type="button"
                 role="menuitem"
+                title={action.help}
+                aria-label={`${action.label}. ${action.help}`}
                 onClick={() => chooseTool(action.type)}
               >
                 <span aria-hidden="true">{action.icon}</span>
@@ -257,26 +267,14 @@ export function EditorToolbar({
                   {result.name && <span>{result.label}</span>}
                 </button>
                 <div className="search-result-actions">
-                  <button type="button" onClick={() => { onAddSearchPoint(result); clearSearch(); }}>Add point</button>
-                  <button type="button" onClick={() => { onUseSearchAsRouteStart(result, routeProfile); clearSearch(); }}>Route from here</button>
+                  <button type="button" title="Add this result as a point in the active layer" onClick={() => { onAddSearchPoint(result); clearSearch(); }}>Add point</button>
+                  <button type="button" title="Use this result as the starting point for a land route" onClick={() => { onUseSearchAsRouteStart(result, routeProfile); clearSearch(); }}>Route from here</button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </form>
-
-      <button
-        className="tool-button locate-device-button"
-        disabled={disabled || locating}
-        type="button"
-        onClick={locateDevice}
-        title="Find this device and add its position to the active layer"
-        aria-label="Find this device and add its position"
-      >
-        <span aria-hidden="true">{locating ? '…' : '◎'}</span>
-        <span className="locate-device-label">{locating ? 'Locating' : 'My location'}</span>
-      </button>
 
       {routingActive && (
         <button className="tool-button route-cancel-button" type="button" onClick={onCancelRouting} title="Cancel route tool">
@@ -286,21 +284,6 @@ export function EditorToolbar({
 
       {routingStatus && <span className="routing-status" role="status">{routingStatus}</span>}
 
-      <div className="toolbar-divider" />
-      <button className={`tool-button view-tool ${viewSaved ? 'is-saved' : ''}`} disabled={disabled} type="button" onClick={onSetView} title="Save the opening view for the shared map">
-        <FrameIcon />
-        <span>{viewSaved ? 'View saved' : 'Set view'}</span>
-      </button>
-      <div className="toolbar-divider" />
-      <button
-        className="tool-button quick-route-tool"
-        disabled={disabled || routingActive}
-        type="button"
-        onClick={onStartQuickRoute}
-        title="Place a start and destination, then edit the route"
-      >
-        <span aria-hidden="true">⤳</span><span>Quick route</span>
-      </button>
       <div className="active-layer-status" title="New features will be added to this layer">
         <span>Drawing on</span>
         <strong>{activeLayer?.name ?? 'No active layer'}</strong>
@@ -407,6 +390,8 @@ export default function Menu({
                 className={activeSection === section ? 'is-active' : ''}
                 key={section}
                 type="button"
+                title={EDITOR_TAB_HELP[section]}
+                aria-label={`${section}. ${EDITOR_TAB_HELP[section]}`}
                 onClick={() => setActiveSection(section)}
               >
                 {section}
@@ -1373,7 +1358,13 @@ function LayersSection({
       `}</style>
       <div className="section-heading-row">
         <p className="section-label">Layers</p>
-        <button className="small-button" type="button" onClick={onAddLayer}>+ Add</button>
+        <button
+          className="small-button"
+          type="button"
+          title="Add a new empty layer and make it the active drawing layer"
+          aria-label="Add a new empty layer and make it active"
+          onClick={onAddLayer}
+        >+ Add</button>
       </div>
       <div className="layer-list">
         {layers.map((layer) => {
@@ -1429,7 +1420,7 @@ function LayersSection({
                 >
                   <EyeIcon hidden={!layer.visible} />
                 </button>
-                <button className="layer-select-button" type="button" onClick={() => onLayerChange(layer.id)}>
+                <button className="layer-select-button" type="button" title={`Make ${layer.name} the active drawing layer`} onClick={() => onLayerChange(layer.id)}>
                   <span className="layer-geometry" aria-hidden="true">◇</span>
                   <strong>{layer.name}</strong>
                 </button>

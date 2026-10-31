@@ -1,15 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const ACTIONS = [
-  { type: 'select', label: 'Select', icon: '↖' },
-  { type: 'point', label: 'Point', icon: '●' },
-  { type: 'line', label: 'Line', icon: '╱' },
-  { type: 'polygon', label: 'Polygon', icon: '⬡' },
-  { type: 'circle', label: 'Circle', icon: '○' },
-  { type: 'text', label: 'Text', icon: 'T' },
-  { type: 'quick-route', label: 'Quick route', icon: '⤳', divider: true },
-  { type: 'water-route', label: 'Water autoroute', icon: '≈' },
-  { type: 'land-route', label: 'Walking route', icon: '⇢' },
+  { type: 'select', label: 'Select', icon: '↖', help: 'Select, move, and edit existing features.' },
+  { type: 'point', label: 'Point', icon: '●', help: 'Place a point on the map.' },
+  { type: 'line', label: 'Line', icon: '╱', help: 'Draw a line one vertex at a time.' },
+  { type: 'polygon', label: 'Polygon', icon: '⬡', help: 'Draw an enclosed area on the map.' },
+  { type: 'circle', label: 'Circle', icon: '○', help: 'Draw a circle from its center and radius.' },
+  { type: 'text', label: 'Text', icon: 'T', help: 'Place editable text on the map.' },
+  { type: 'my-location', label: 'My location', icon: '◎', help: "Place a point on the map at your device's location." },
+  { type: 'quick-route', label: 'Quick route', icon: '⤳', divider: true, help: 'Place two points, then adjust the automatic line connecting them.' },
+  { type: 'water-route', label: 'Water autoroute', icon: '≈', help: 'Create an editable water route that avoids land.' },
+  { type: 'land-route', label: 'Walking route', icon: '⇢', help: 'Place two points to create a walking route.' },
 ];
 
 export default function DrawingContextMenu({ activeLayerName, position, onChoose, onClose }) {
@@ -65,6 +66,8 @@ export default function DrawingContextMenu({ activeLayerName, position, onChoose
           key={action.type}
           type="button"
           role="menuitem"
+          title={action.help}
+          aria-label={`${action.label}. ${action.help}`}
           onClick={() => onChoose(action.type)}
         >
           <span aria-hidden="true">{action.icon}</span>

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getBasemapStyleDefaults } from './style-defaults.js';
 
+const FEATURE_TAB_HELP = {
+  details: 'Edit the feature name, description, and visual appearance.',
+  text: 'Configure a feature label or styled map text.',
+  popup: 'Build and preview the popup shown when viewers select this feature.',
+  properties: "Add or edit the feature's GeoJSON key-value properties.",
+  geometry: 'Run geometry operations on the selected feature or features.',
+};
+
 const RESERVED_PROPERTIES = new Set([
   'name',
   'description',
@@ -167,7 +175,14 @@ export default function FeatureEditor({ feature, features = [], basemapId, onDel
 
       <nav className={`feature-editor-tabs ${multiple ? 'is-multi' : ''}`} aria-label="Feature editor sections">
         {(multiple ? ['geometry'] : ['details', 'text', 'popup', 'properties', 'geometry']).map((tab) => (
-          <button className={activeTab === tab ? 'is-active' : ''} key={tab} type="button" onClick={() => setActiveTab(tab)}>
+          <button
+            className={activeTab === tab ? 'is-active' : ''}
+            key={tab}
+            type="button"
+            title={FEATURE_TAB_HELP[tab]}
+            aria-label={`${tab}. ${FEATURE_TAB_HELP[tab]}`}
+            onClick={() => setActiveTab(tab)}
+          >
             {tab}
           </button>
         ))}

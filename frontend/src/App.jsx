@@ -428,6 +428,7 @@ export default function App() {
     if (type === 'quick-route') handleStartQuickRoute();
     else if (type === 'water-route') handleStartWaterRoute();
     else if (type === 'land-route') handleStartRouting('foot-walking');
+    else if (type === 'my-location') handleLocateDevice();
     else handleDraw(type);
   }
 
@@ -1694,14 +1695,12 @@ export default function App() {
             onLocateDevice={handleLocateDevice}
             onCancelRouting={handleCancelRouting}
             onPreviewSearchResult={handlePreviewSearchResult}
-            onSetView={handleSaveView}
             onStartRouting={handleStartRouting}
             onStartQuickRoute={handleStartQuickRoute}
             onStartWaterRoute={handleStartWaterRoute}
             onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
             routingActive={routingActive || quickRouteActive || waterRouteActive || waterRouteLoading}
             routingStatus={waterRouteStatus || quickRouteStatus || routingStatus}
-            viewSaved={Boolean(savedView)}
             tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
           />
         </>
