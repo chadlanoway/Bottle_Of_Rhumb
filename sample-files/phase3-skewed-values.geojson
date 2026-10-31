@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "name": "Phase 3 skewed values",
+  "features": [
+    {"type":"Feature","id":"skew-01","properties":{"name":"Area 1","value":1},"geometry":{"type":"Polygon","coordinates":[[[-89.9,43.0],[-89.7,43.0],[-89.7,43.2],[-89.9,43.2],[-89.9,43.0]]]}},
+    {"type":"Feature","id":"skew-02","properties":{"name":"Area 2","value":2},"geometry":{"type":"Polygon","coordinates":[[[-89.65,43.0],[-89.45,43.0],[-89.45,43.2],[-89.65,43.2],[-89.65,43.0]]]}},
+    {"type":"Feature","id":"skew-03","properties":{"name":"Area 3","value":3},"geometry":{"type":"Polygon","coordinates":[[[-89.4,43.0],[-89.2,43.0],[-89.2,43.2],[-89.4,43.2],[-89.4,43.0]]]}},
+    {"type":"Feature","id":"skew-04","properties":{"name":"Area 4","value":4},"geometry":{"type":"Polygon","coordinates":[[[-89.15,43.0],[-88.95,43.0],[-88.95,43.2],[-89.15,43.2],[-89.15,43.0]]]}},
+    {"type":"Feature","id":"skew-05","properties":{"name":"Area 5","value":8},"geometry":{"type":"Polygon","coordinates":[[[-89.9,42.75],[-89.7,42.75],[-89.7,42.95],[-89.9,42.95],[-89.9,42.75]]]}},
+    {"type":"Feature","id":"skew-06","properties":{"name":"Area 6","value":15},"geometry":{"type":"Polygon","coordinates":[[[-89.65,42.75],[-89.45,42.75],[-89.45,42.95],[-89.65,42.95],[-89.65,42.75]]]}},
+    {"type":"Feature","id":"skew-07","properties":{"name":"Area 7","value":16},"geometry":{"type":"Polygon","coordinates":[[[-89.4,42.75],[-89.2,42.75],[-89.2,42.95],[-89.4,42.95],[-89.4,42.75]]]}},
+    {"type":"Feature","id":"skew-08","properties":{"name":"Area 8","value":30},"geometry":{"type":"Polygon","coordinates":[[[-89.15,42.75],[-88.95,42.75],[-88.95,42.95],[-89.15,42.95],[-89.15,42.75]]]}},
+    {"type":"Feature","id":"skew-09","properties":{"name":"Area 9","value":55},"geometry":{"type":"Polygon","coordinates":[[[-89.65,42.5],[-89.45,42.5],[-89.45,42.7],[-89.65,42.7],[-89.65,42.5]]]}},
+    {"type":"Feature","id":"skew-10","properties":{"name":"Area 10","value":90},"geometry":{"type":"Polygon","coordinates":[[[-89.4,42.5],[-89.2,42.5],[-89.2,42.7],[-89.4,42.7],[-89.4,42.5]]]}}
+  ]
+}

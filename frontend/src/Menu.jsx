@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { FaGithub } from 'react-icons/fa';
 import {
+  CHOROPLETH_RAMPS,
+  buildChoroplethClasses,
+  layerSupportsPolygonVisualization,
   layerSupportsPointVisualization,
   layerVisualization,
   numericFieldsForLayer,
@@ -134,7 +137,6 @@ export function EditorToolbar({
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchMessage, setSearchMessage] = useState('');
-  const [locating, setLocating] = useState(false);
   const drawMenuRef = useRef(null);
   const searchRef = useRef(null);
 
@@ -187,9 +189,7 @@ export function EditorToolbar({
   }
 
   async function locateDevice() {
-    setLocating(true);
     await onLocateDevice();
-    setLocating(false);
   }
 
   return (
@@ -1382,7 +1382,13 @@ function LayersSection({
             layer.id,
             layers[0]?.id,
           );
+          const supportsPolygonVisualization = layerSupportsPolygonVisualization(
+            features,
+            layer.id,
+            layers[0]?.id,
+          );
           const numericFields = numericFieldsForLayer(features, layer.id, layers[0]?.id);
+          const choroplethPreview = buildChoroplethClasses(layerFeatures, visualization);
 
           return (
             <section
@@ -1447,15 +1453,22 @@ function LayersSection({
                       ['symbols', 'Symbols'],
                       ['clusters', 'Clusters'],
                       ['heatmap', 'Heat map'],
+                      ['choropleth', 'Choropleth'],
                     ].map(([type, label]) => {
-                      const unavailable = type !== 'symbols' && !supportsPointVisualization;
+                      const pointType = type === 'clusters' || type === 'heatmap';
+                      const unavailable = (pointType && !supportsPointVisualization)
+                        || (type === 'choropleth' && !supportsPolygonVisualization);
                       return (
                         <button
                           className={visualization.type === type ? 'is-active' : ''}
                           disabled={unavailable}
                           key={type}
                           type="button"
-                          title={unavailable ? 'This visualization requires a point-only layer.' : `Display as ${label.toLowerCase()}`}
+                          title={unavailable
+                            ? type === 'choropleth'
+                              ? 'Choropleths require a polygon-only layer.'
+                              : 'This visualization requires a point-only layer.'
+                            : `Display as ${label.toLowerCase()}`}
                           onClick={() => onLayerVisualizationChange(layer.id, { type })}
                         >
                           {label}
@@ -1519,6 +1532,113 @@ function LayersSection({
                         onChange={(clusterRadius) => onLayerVisualizationChange(layer.id, { clusterRadius })}
                       />
                       <p className="visualization-help">Click a cluster on the map to expand it. Switch back to Symbols to edit individual points.</p>
+                    </div>
+                  )}
+
+                  {visualization.type === 'choropleth' && supportsPolygonVisualization && (
+                    <div className="visualization-settings choropleth-settings">
+                      <label className="field-label" htmlFor={`choropleth-field-${layer.id}`}>Numeric field</label>
+                      <select
+                        id={`choropleth-field-${layer.id}`}
+                        value={visualization.choroplethField}
+                        onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethField: event.target.value })}
+                      >
+                        <option value="">Choose a field…</option>
+                        {numericFields.map((field) => <option key={field} value={field}>{field}</option>)}
+                      </select>
+
+                      <div className="choropleth-setting-grid">
+                        <label>
+                          <span className="field-label">Classification</span>
+                          <select
+                            value={visualization.choroplethMethod}
+                            onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethMethod: event.target.value })}
+                          >
+                            <option value="quantile">Quantile</option>
+                            <option value="equal">Equal interval</option>
+                            <option value="jenks">Natural breaks (Jenks)</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span className="field-label">Classes</span>
+                          <select
+                            value={visualization.choroplethClasses}
+                            onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethClasses: Number(event.target.value) })}
+                          >
+                            {[3, 4, 5, 6, 7].map((count) => <option key={count} value={count}>{count}</option>)}
+                          </select>
+                        </label>
+                      </div>
+
+                      <label className="field-label" htmlFor={`choropleth-ramp-${layer.id}`}>Color ramp</label>
+                      <div className="choropleth-ramp-row">
+                        <select
+                          id={`choropleth-ramp-${layer.id}`}
+                          value={visualization.choroplethRamp}
+                          onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethRamp: event.target.value })}
+                        >
+                          {Object.entries(CHOROPLETH_RAMPS).map(([id, ramp]) => (
+                            <option key={id} value={id}>{ramp.label}</option>
+                          ))}
+                        </select>
+                        <label className="choropleth-reverse">
+                          <input
+                            type="checkbox"
+                            checked={visualization.choroplethReverse}
+                            onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethReverse: event.target.checked })}
+                          />
+                          <span>Reverse</span>
+                        </label>
+                      </div>
+
+                      {choroplethPreview.length > 0 && (
+                        <div className="choropleth-preview" aria-label="Choropleth class preview">
+                          {choroplethPreview.map((entry, index) => (
+                            <span key={`${entry.minimum}-${index}`} title={entry.label} style={{ backgroundColor: entry.color }} />
+                          ))}
+                        </div>
+                      )}
+
+                      <RangeSetting
+                        id={`choropleth-opacity-${layer.id}`}
+                        label="Fill opacity"
+                        min="0.1"
+                        max="1"
+                        step="0.05"
+                        value={visualization.choroplethOpacity}
+                        onChange={(choroplethOpacity) => onLayerVisualizationChange(layer.id, { choroplethOpacity })}
+                      />
+                      <div className="choropleth-setting-grid">
+                        <label>
+                          <span className="field-label">Outline color</span>
+                          <input
+                            className="choropleth-color-input"
+                            type="color"
+                            value={visualization.choroplethOutlineColor}
+                            onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethOutlineColor: event.target.value })}
+                          />
+                        </label>
+                        <label>
+                          <span className="field-label">No data</span>
+                          <input
+                            className="choropleth-color-input"
+                            type="color"
+                            value={visualization.choroplethNoDataColor}
+                            onChange={(event) => onLayerVisualizationChange(layer.id, { choroplethNoDataColor: event.target.value })}
+                          />
+                        </label>
+                      </div>
+                      <RangeSetting
+                        id={`choropleth-outline-${layer.id}`}
+                        label="Outline width"
+                        min="0"
+                        max="5"
+                        step="0.5"
+                        suffix=" px"
+                        value={visualization.choroplethOutlineWidth}
+                        onChange={(choroplethOutlineWidth) => onLayerVisualizationChange(layer.id, { choroplethOutlineWidth })}
+                      />
+                      <p className="visualization-help">Switch to Symbols to edit individual polygons.</p>
                     </div>
                   )}
 

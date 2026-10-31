@@ -9,6 +9,23 @@ export const DEFAULT_LAYER_VISUALIZATION = Object.freeze({
   heatOpacity: 0.78,
   clusterRadius: 50,
   clusterMaxZoom: 14,
+  choroplethField: '',
+  choroplethMethod: 'quantile',
+  choroplethClasses: 5,
+  choroplethRamp: 'blues',
+  choroplethReverse: false,
+  choroplethOpacity: 0.78,
+  choroplethOutlineColor: '#ffffff',
+  choroplethOutlineWidth: 1,
+  choroplethNoDataColor: '#9aa3ad',
+});
+
+export const CHOROPLETH_RAMPS = Object.freeze({
+  blues: { label: 'Blues', colors: ['#eff3ff', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#084594'] },
+  yellowRed: { label: 'Yellow to red', colors: ['#ffffcc', '#ffeda0', '#fed976', '#feb24c', '#fd8d3c', '#f03b20', '#bd0026'] },
+  viridis: { label: 'Viridis', colors: ['#440154', '#443983', '#31688e', '#21918c', '#35b779', '#90d743', '#fde725'] },
+  purple: { label: 'Purples', colors: ['#f2f0f7', '#dadaeb', '#bcbddc', '#9e9ac8', '#807dba', '#6a51a3', '#4a1486'] },
+  diverging: { label: 'Blue to red', colors: ['#2166ac', '#67a9cf', '#d1e5f0', '#f7f7f7', '#fddbc7', '#ef8a62', '#b2182b'] },
 });
 
 export function layerVisualization(layer) {
@@ -47,6 +64,46 @@ export function layerSupportsPointVisualization(features, layerId, fallbackLayer
     && layerFeatures.every((feature) => feature.geometry?.type === 'Point');
 }
 
+export function layerSupportsPolygonVisualization(features, layerId, fallbackLayerId = 'default-layer') {
+  const layerFeatures = (features ?? []).filter(
+    (feature) => (feature.properties?.layerId ?? fallbackLayerId) === layerId,
+  );
+  return layerFeatures.length > 0
+    && layerFeatures.every((feature) => ['Polygon', 'MultiPolygon'].includes(feature.geometry?.type));
+}
+
+export function buildChoroplethClasses(features, visualization) {
+  const field = visualization?.choroplethField;
+  if (!field) return [];
+  const values = (features ?? [])
+    .map((feature) => feature.properties?.[field])
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  if (values.length === 0) return [];
+
+  const requested = clamp(Math.round(Number(visualization.choroplethClasses) || 5), 3, 7);
+  const classCount = Math.min(requested, new Set(values).size);
+  const method = visualization.choroplethMethod || 'quantile';
+  let thresholds;
+  if (method === 'equal') thresholds = equalIntervalThresholds(values, classCount);
+  else if (method === 'jenks') thresholds = jenksThresholds(values, classCount);
+  else thresholds = quantileThresholds(values, classCount);
+  thresholds = [...new Set(thresholds)].filter((value) => Number.isFinite(value));
+
+  const ramp = CHOROPLETH_RAMPS[visualization.choroplethRamp] ?? CHOROPLETH_RAMPS.blues;
+  const colors = sampleColors(
+    visualization.choroplethReverse ? [...ramp.colors].reverse() : ramp.colors,
+    thresholds.length + 1,
+  );
+  const boundaries = [values[0], ...thresholds, values[values.length - 1]];
+  return colors.map((color, index) => ({
+    color,
+    minimum: boundaries[index],
+    maximum: boundaries[index + 1],
+    label: formatClassRange(boundaries[index], boundaries[index + 1], index === colors.length - 1),
+  }));
+}
+
 export function syncLayerVisualizations(map, layers, features, fallbackLayerId = 'default-layer') {
   if (!map?.isStyleLoaded?.()) {
     queueVisualizationSync(map, layers, features, fallbackLayerId);
@@ -59,6 +116,17 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
   for (const layer of layers ?? []) {
     const visualization = layerVisualization(layer);
     if (!layer.visible || visualization.type === 'symbols') continue;
+
+    if (visualization.type === 'choropleth') {
+      const polygonFeatures = (features ?? []).filter((feature) => (
+        (feature.properties?.layerId ?? fallbackLayerId) === layer.id
+        && ['Polygon', 'MultiPolygon'].includes(feature.geometry?.type)
+      ));
+      if (polygonFeatures.length === 0 || !visualization.choroplethField) continue;
+      activeIds.add(safeId(layer.id));
+      syncChoropleth(map, layer, polygonFeatures, visualization);
+      continue;
+    }
 
     const pointFeatures = (features ?? []).filter((feature) => (
       (feature.properties?.layerId ?? fallbackLayerId) === layer.id
@@ -75,6 +143,43 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
   }
 
   removeInactiveVisualizations(map, activeIds);
+}
+
+function syncChoropleth(map, layer, polygonFeatures, visualization) {
+  const id = safeId(layer.id);
+  const sourceId = `${PREFIX}${id}-choropleth-source`;
+  const fillId = `${PREFIX}${id}-choropleth-fill`;
+  const outlineId = `${PREFIX}${id}-choropleth-outline`;
+  removeVisualizationType(map, id, 'heat');
+  removeVisualizationType(map, id, 'cluster');
+  setGeoJsonSource(map, sourceId, polygonFeatures, null);
+
+  const classes = buildChoroplethClasses(polygonFeatures, visualization);
+  if (classes.length === 0) {
+    removeVisualizationType(map, id, 'choropleth');
+    return;
+  }
+  const field = visualization.choroplethField;
+  const step = ['step', ['to-number', ['get', field]], classes[0].color];
+  for (let index = 1; index < classes.length; index += 1) {
+    step.push(classes[index].minimum, classes[index].color);
+  }
+  const fillColor = ['case', ['has', field], step, visualization.choroplethNoDataColor];
+  const fillPaint = {
+    'fill-color': fillColor,
+    'fill-opacity': Number(visualization.choroplethOpacity),
+  };
+  const linePaint = {
+    'line-color': visualization.choroplethOutlineColor,
+    'line-width': Number(visualization.choroplethOutlineWidth),
+  };
+
+  if (!map.getLayer(fillId)) map.addLayer({ id: fillId, type: 'fill', source: sourceId, paint: fillPaint });
+  else for (const [property, value] of Object.entries(fillPaint)) map.setPaintProperty(fillId, property, value);
+  if (!map.getLayer(outlineId)) map.addLayer({ id: outlineId, type: 'line', source: sourceId, paint: linePaint });
+  else for (const [property, value] of Object.entries(linePaint)) map.setPaintProperty(outlineId, property, value);
+
+  bindLayerHandlerOnce(map, `cursor:${fillId}`, () => setPointerCursor(map, fillId));
 }
 
 function queueVisualizationSync(map, layers, features, fallbackLayerId) {
@@ -249,17 +354,17 @@ function setGeoJsonSource(map, sourceId, features, options) {
 function removeInactiveVisualizations(map, activeIds) {
   for (const sourceId of Object.keys(map.getStyle().sources ?? {})) {
     if (!sourceId.startsWith(PREFIX)) continue;
-    const id = sourceId.slice(PREFIX.length).replace(/-(heat|cluster)-source$/, '');
+    const id = sourceId.slice(PREFIX.length).replace(/-(heat|cluster|choropleth)-source$/, '');
     if (!activeIds.has(id)) removeVisualization(map, id);
   }
 }
 
 function removeVisualization(map, id) {
-  for (const suffix of ['heat', 'cluster-circles', 'cluster-count', 'cluster-points']) {
+  for (const suffix of ['heat', 'cluster-circles', 'cluster-count', 'cluster-points', 'choropleth-fill', 'choropleth-outline']) {
     const layerId = `${PREFIX}${id}-${suffix}`;
     if (map.getLayer(layerId)) map.removeLayer(layerId);
   }
-  for (const suffix of ['heat-source', 'cluster-source']) {
+  for (const suffix of ['heat-source', 'cluster-source', 'choropleth-source']) {
     const sourceId = `${PREFIX}${id}-${suffix}`;
     if (map.getSource(sourceId)) map.removeSource(sourceId);
   }
@@ -268,7 +373,9 @@ function removeVisualization(map, id) {
 function removeVisualizationType(map, id, type) {
   const suffixes = type === 'heat'
     ? ['heat']
-    : ['cluster-circles', 'cluster-count', 'cluster-points'];
+    : type === 'cluster'
+      ? ['cluster-circles', 'cluster-count', 'cluster-points']
+      : ['choropleth-fill', 'choropleth-outline'];
   for (const suffix of suffixes) {
     const layerId = `${PREFIX}${id}-${suffix}`;
     if (map.getLayer(layerId)) map.removeLayer(layerId);
@@ -291,4 +398,85 @@ function bindLayerHandlerOnce(map, key, bind) {
 
 function safeId(value) {
   return String(value).replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function equalIntervalThresholds(values, classCount) {
+  const minimum = values[0];
+  const maximum = values[values.length - 1];
+  if (minimum === maximum) return [];
+  return Array.from({ length: classCount - 1 }, (_, index) => (
+    minimum + ((maximum - minimum) * (index + 1)) / classCount
+  ));
+}
+
+function quantileThresholds(values, classCount) {
+  return Array.from({ length: classCount - 1 }, (_, index) => {
+    const position = ((values.length - 1) * (index + 1)) / classCount;
+    const lower = Math.floor(position);
+    const fraction = position - lower;
+    return values[lower] + ((values[Math.min(lower + 1, values.length - 1)] - values[lower]) * fraction);
+  });
+}
+
+function jenksThresholds(values, classCount) {
+  if (classCount <= 1 || values.length <= 1) return [];
+  const count = values.length;
+  const lower = Array.from({ length: count + 1 }, () => Array(classCount + 1).fill(0));
+  const variance = Array.from({ length: count + 1 }, () => Array(classCount + 1).fill(Infinity));
+  for (let group = 1; group <= classCount; group += 1) {
+    lower[1][group] = 1;
+    variance[1][group] = 0;
+  }
+  for (let length = 2; length <= count; length += 1) {
+    let sum = 0;
+    let sumSquares = 0;
+    let weight = 0;
+    for (let offset = 1; offset <= length; offset += 1) {
+      const start = length - offset + 1;
+      const value = values[start - 1];
+      weight += 1;
+      sum += value;
+      sumSquares += value * value;
+      const currentVariance = sumSquares - ((sum * sum) / weight);
+      const previous = start - 1;
+      if (previous === 0) continue;
+      for (let group = 2; group <= classCount; group += 1) {
+        const candidate = currentVariance + variance[previous][group - 1];
+        if (candidate < variance[length][group]) {
+          lower[length][group] = start;
+          variance[length][group] = candidate;
+        }
+      }
+    }
+    lower[length][1] = 1;
+    variance[length][1] = sumSquares - ((sum * sum) / weight);
+  }
+  const breaks = [];
+  let end = count;
+  for (let group = classCount; group > 1; group -= 1) {
+    const start = lower[end][group];
+    if (!start) return quantileThresholds(values, classCount);
+    breaks.unshift(values[start - 1]);
+    end = start - 1;
+  }
+  return breaks;
+}
+
+function sampleColors(colors, count) {
+  if (count === 1) return [colors[Math.floor(colors.length / 2)]];
+  return Array.from({ length: count }, (_, index) => (
+    colors[Math.round((index * (colors.length - 1)) / (count - 1))]
+  ));
+}
+
+function formatClassRange(minimum, maximum, finalClass) {
+  const format = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+  if (minimum === maximum) return format.format(minimum);
+  return finalClass
+    ? `${format.format(minimum)} – ${format.format(maximum)}`
+    : `${format.format(minimum)} – < ${format.format(maximum)}`;
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
 }

@@ -61,7 +61,9 @@ import {
 import { DEFAULT_STYLE, getBasemapStyleDefaults } from './style-defaults.js';
 import {
   DEFAULT_LAYER_VISUALIZATION,
+  buildChoroplethClasses,
   drawingHiddenLayerIds,
+  layerVisualization,
   removeLayerVisualizations,
   syncLayerVisualizations,
 } from './layer-visualization.js';
@@ -1872,6 +1874,27 @@ function MapLegend({ legend, layers, features }) {
           const layerFeatures = features.filter(
             (feature) => (feature.properties?.layerId ?? layers[0]?.id) === layer.id,
           );
+          const visualization = layerVisualization(layer);
+          const choroplethClasses = visualization.type === 'choropleth'
+            ? buildChoroplethClasses(layerFeatures, visualization)
+            : [];
+          if (choroplethClasses.length > 0) {
+            return (
+              <div className="map-legend__choropleth" key={layer.id}>
+                <strong>{layer.legendLabel || layer.name}</strong>
+                {choroplethClasses.map((entry, index) => (
+                  <div className="map-legend__item" key={`${entry.minimum}-${index}`}>
+                    <span
+                      className="map-legend__class-swatch"
+                      style={{ backgroundColor: entry.color }}
+                      aria-hidden="true"
+                    />
+                    <span>{entry.label}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
           const symbol = getLegendSymbol(layerFeatures);
           return (
             <div className="map-legend__item" key={layer.id}>

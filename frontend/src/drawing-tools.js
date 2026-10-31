@@ -479,7 +479,13 @@ export function setupViewerFeatureInteractions(draw, map, getStyleDefaults) {
   ];
 
   const popupFeatureAt = (point) => {
-    const layers = hitLayerIds.filter((layerId) => map.getLayer(layerId));
+    const choroplethLayers = (map.getStyle()?.layers ?? [])
+      .map((layer) => layer.id)
+      .filter((layerId) => layerId.startsWith('rhumb-visualization-') && layerId.endsWith('-choropleth-fill'));
+    const layers = [
+      ...hitLayerIds.filter((layerId) => map.getLayer(layerId)),
+      ...choroplethLayers,
+    ];
     if (layers.length === 0) return null;
 
     const rendered = map.queryRenderedFeatures(

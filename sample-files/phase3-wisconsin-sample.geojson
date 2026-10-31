@@ -1,0 +1,18 @@
+{
+  "type": "FeatureCollection",
+  "name": "Phase 3 Wisconsin sample",
+  "features": [
+    {"type":"Feature","id":"wi-01","properties":{"name":"Northwest","population":14200,"rate":4.2,"category_code":1},"geometry":{"type":"Polygon","coordinates":[[[-92.1,46.0],[-91.5,46.0],[-91.5,46.5],[-92.1,46.5],[-92.1,46.0]]]}},
+    {"type":"Feature","id":"wi-02","properties":{"name":"North Central","population":31800,"rate":7.9,"category_code":2},"geometry":{"type":"Polygon","coordinates":[[[-91.45,46.0],[-90.85,46.0],[-90.85,46.5],[-91.45,46.5],[-91.45,46.0]]]}},
+    {"type":"Feature","id":"wi-03","properties":{"name":"Northeast","population":86500,"rate":13.4,"category_code":3},"geometry":{"type":"Polygon","coordinates":[[[-90.8,46.0],[-90.2,46.0],[-90.2,46.5],[-90.8,46.5],[-90.8,46.0]]]}},
+    {"type":"Feature","id":"wi-04","properties":{"name":"West","population":22700,"rate":5.1,"category_code":1},"geometry":{"type":"Polygon","coordinates":[[[-92.1,45.45],[-91.5,45.45],[-91.5,45.95],[-92.1,45.95],[-92.1,45.45]]]}},
+    {"type":"Feature","id":"wi-05","properties":{"name":"Central","population":57900,"rate":9.6,"category_code":2},"geometry":{"type":"Polygon","coordinates":[[[-91.45,45.45],[-90.85,45.45],[-90.85,45.95],[-91.45,45.95],[-91.45,45.45]]]}},
+    {"type":"Feature","id":"wi-06","properties":{"name":"East","population":211000,"rate":18.8,"category_code":4},"geometry":{"type":"Polygon","coordinates":[[[-90.8,45.45],[-90.2,45.45],[-90.2,45.95],[-90.8,45.95],[-90.8,45.45]]]}},
+    {"type":"Feature","id":"wi-07","properties":{"name":"Southwest","population":19400,"rate":4.8,"category_code":1},"geometry":{"type":"Polygon","coordinates":[[[-92.1,44.9],[-91.5,44.9],[-91.5,45.4],[-92.1,45.4],[-92.1,44.9]]]}},
+    {"type":"Feature","id":"wi-08","properties":{"name":"South Central","population":128000,"rate":15.2,"category_code":3},"geometry":{"type":"Polygon","coordinates":[[[-91.45,44.9],[-90.85,44.9],[-90.85,45.4],[-91.45,45.4],[-91.45,44.9]]]}},
+    {"type":"Feature","id":"wi-09","properties":{"name":"Southeast","population":486000,"rate":27.5,"category_code":5},"geometry":{"type":"Polygon","coordinates":[[[-90.8,44.9],[-90.2,44.9],[-90.2,45.4],[-90.8,45.4],[-90.8,44.9]]]}},
+    {"type":"Feature","id":"wi-10","properties":{"name":"Lower West","population":36400,"rate":6.3,"category_code":2},"geometry":{"type":"Polygon","coordinates":[[[-92.1,44.35],[-91.5,44.35],[-91.5,44.85],[-92.1,44.85],[-92.1,44.35]]]}},
+    {"type":"Feature","id":"wi-11","properties":{"name":"Lower Central","population":94500,"rate":11.7,"category_code":3},"geometry":{"type":"Polygon","coordinates":[[[-91.45,44.35],[-90.85,44.35],[-90.85,44.85],[-91.45,44.85],[-91.45,44.35]]]}},
+    {"type":"Feature","id":"wi-12","properties":{"name":"Lower East","population":302000,"rate":22.1,"category_code":4},"geometry":{"type":"Polygon","coordinates":[[[-90.8,44.35],[-90.2,44.35],[-90.2,44.85],[-90.8,44.85],[-90.8,44.35]]]}}
+  ]
+}
