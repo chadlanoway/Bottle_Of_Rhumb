@@ -16,8 +16,43 @@ export function isSupportedSpatialFile(file) {
   return Boolean(file?.name && SUPPORTED_EXTENSION.test(file.name));
 }
 
+export function isCsvFile(file) {
+  return Boolean(file?.name && /\.csv$/i.test(file.name));
+}
+
 export function spatialFileLayerName(filename) {
   return filename.replace(SUPPORTED_EXTENSION, '') || 'Imported layer';
+}
+
+export async function inspectCsvFile(file) {
+  if (!isCsvFile(file)) throw new Error('Choose a CSV file.');
+  const parsed = parseCsv(await file.text());
+  const { fields, rows } = parsed;
+  const latitudeField = findColumn(fields, LATITUDE_NAMES);
+  const longitudeField = findColumn(fields, LONGITUDE_NAMES);
+  const fullAddressField = findColumn(fields, FULL_ADDRESS_NAMES);
+  const suggestions = {
+    mode: latitudeField && longitudeField ? 'coordinates' : 'address',
+    latitudeField: latitudeField ?? '',
+    longitudeField: longitudeField ?? '',
+    nameField: findColumn(fields, NAME_NAMES) ?? '',
+    addressMode: fullAddressField ? 'full' : 'components',
+    fullAddressField: fullAddressField ?? '',
+    streetField: findColumn(fields, STREET_NAMES) ?? '',
+    cityField: findColumn(fields, CITY_NAMES) ?? '',
+    stateField: findColumn(fields, STATE_NAMES) ?? '',
+    postalField: findColumn(fields, POSTAL_NAMES) ?? '',
+    countryField: findColumn(fields, COUNTRY_NAMES) ?? '',
+  };
+
+  return {
+    fields,
+    rows,
+    totalRows: rows.length,
+    previewRows: rows.slice(0, 5),
+    numericFields: findNumericFieldsInRows(rows, fields),
+    suggestions,
+  };
 }
 
 export async function readSpatialFile(file, options = {}) {
@@ -49,30 +84,26 @@ export async function readSpatialFile(file, options = {}) {
 }
 
 async function readCsv(text, options) {
-  const parsed = Papa.parse(text, {
-    header: true,
-    skipEmptyLines: 'greedy',
-    transformHeader: (header) => header.trim(),
-  });
+  const parsed = parseCsv(text);
+  const fields = parsed.fields;
+  const rows = parsed.rows;
+  const mapping = options.csvMapping ?? {};
 
-  const fatal = parsed.errors.find((error) => error.type === 'Quotes' || error.type === 'Delimiter');
-  if (fatal) throw new Error(`The CSV could not be parsed: ${fatal.message}`);
-
-  const fields = (parsed.meta.fields ?? []).filter(Boolean);
-  if (fields.length === 0) throw new Error('The CSV does not contain a header row.');
-
-  const latitudeField = findColumn(fields, LATITUDE_NAMES);
-  const longitudeField = findColumn(fields, LONGITUDE_NAMES);
-  if (!latitudeField || !longitudeField) {
-    return readAddressCsv(parsed.data, fields, options);
+  const latitudeField = mapping.latitudeField || findColumn(fields, LATITUDE_NAMES);
+  const longitudeField = mapping.longitudeField || findColumn(fields, LONGITUDE_NAMES);
+  if (mapping.mode === 'address' || (!latitudeField || !longitudeField)) {
+    return readAddressCsv(rows, fields, options, mapping);
   }
 
-  const nameField = findColumn(fields, NAME_NAMES);
+  if (!fields.includes(latitudeField) || !fields.includes(longitudeField)) {
+    throw new Error('Select valid latitude and longitude columns.');
+  }
+  const nameField = mapping.nameField || findColumn(fields, NAME_NAMES);
   const features = [];
   const skippedRows = [];
   let skippedRowCount = 0;
 
-  parsed.data.forEach((row, index) => {
+  rows.forEach((row, index) => {
     const latitude = parseCoordinate(row[latitudeField]);
     const longitude = parseCoordinate(row[longitudeField]);
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90
@@ -114,7 +145,7 @@ async function readCsv(text, options) {
     features,
     importReport: {
       type: 'csv',
-      totalRows: parsed.data.length,
+      totalRows: rows.length,
       importedRows: features.length,
       skippedRows,
       skippedRowCount,
@@ -125,21 +156,25 @@ async function readCsv(text, options) {
   };
 }
 
-async function readAddressCsv(rows, fields, options) {
+async function readAddressCsv(rows, fields, options, mapping = {}) {
   if (typeof options.geocodeAddresses !== 'function') {
     throw new Error(
       'This CSV does not contain latitude/longitude columns. Configure the address-geocoding API to import address-only CSV files.',
     );
   }
 
-  const fullAddressField = findColumn(fields, FULL_ADDRESS_NAMES);
-  const componentFields = [
-    findColumn(fields, STREET_NAMES),
-    findColumn(fields, CITY_NAMES),
-    findColumn(fields, STATE_NAMES),
-    findColumn(fields, POSTAL_NAMES),
-    findColumn(fields, COUNTRY_NAMES),
-  ].filter(Boolean);
+  const fullAddressField = mapping.addressMode === 'components'
+    ? null
+    : mapping.fullAddressField || findColumn(fields, FULL_ADDRESS_NAMES);
+  const componentFields = (mapping.addressMode === 'components'
+    ? [mapping.streetField, mapping.cityField, mapping.stateField, mapping.postalField, mapping.countryField]
+    : [
+      findColumn(fields, STREET_NAMES),
+      findColumn(fields, CITY_NAMES),
+      findColumn(fields, STATE_NAMES),
+      findColumn(fields, POSTAL_NAMES),
+      findColumn(fields, COUNTRY_NAMES),
+    ]).filter((field) => field && fields.includes(field));
   const addressFields = fullAddressField ? [fullAddressField] : [...new Set(componentFields)];
   if (addressFields.length === 0) {
     throw new Error(
@@ -173,7 +208,7 @@ async function readAddressCsv(rows, fields, options) {
   const results = await options.geocodeAddresses(candidates.map((candidate) => candidate.address));
   if (!Array.isArray(results)) throw new Error('The geocoding service returned an invalid result.');
 
-  const nameField = findColumn(fields, NAME_NAMES);
+  const nameField = mapping.nameField || findColumn(fields, NAME_NAMES);
   const features = [];
   const unmatchedRows = [];
   let unmatchedRowCount = 0;
@@ -239,6 +274,19 @@ async function readAddressCsv(rows, fields, options) {
   };
 }
 
+function parseCsv(text) {
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: 'greedy',
+    transformHeader: (header) => header.trim(),
+  });
+  const fatal = parsed.errors.find((error) => error.type === 'Quotes' || error.type === 'Delimiter');
+  if (fatal) throw new Error(`The CSV could not be parsed: ${fatal.message}`);
+  const fields = (parsed.meta.fields ?? []).filter(Boolean);
+  if (fields.length === 0) throw new Error('The CSV does not contain a header row.');
+  return { fields, rows: parsed.data };
+}
+
 function normalizeColumnName(value) {
   return String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
@@ -270,6 +318,18 @@ function findNumericFields(features, fields) {
       .map((feature) => feature.properties?.[field])
       .filter((value) => value !== null && value !== undefined);
     return values.length > 0 && values.every(Number.isFinite);
+  });
+}
+
+function findNumericFieldsInRows(rows, fields) {
+  return fields.filter((field) => {
+    const values = rows
+      .map((row) => String(row[field] ?? '').trim())
+      .filter(Boolean);
+    return values.length > 0 && values.every((value) => {
+      const number = Number(value.replace(/,/g, ''));
+      return Number.isFinite(number);
+    });
   });
 }
 

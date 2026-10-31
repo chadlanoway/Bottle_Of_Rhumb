@@ -3,6 +3,7 @@ import Menu, { AppHeader, EditorToolbar } from './Menu.jsx';
 import FeatureEditor from './FeatureEditor.jsx';
 import Tutorial from './Tutorial.jsx';
 import DrawingContextMenu from './DrawingContextMenu.jsx';
+import CsvImportWizard from './CsvImportWizard.jsx';
 import {
   BASEMAPS,
   createMap,
@@ -42,6 +43,8 @@ import {
   uploadPopupImage,
 } from './image-upload.js';
 import {
+  inspectCsvFile,
+  isCsvFile,
   isSupportedSpatialFile,
   readSpatialFile,
   spatialFileLayerName,
@@ -106,6 +109,7 @@ export default function App() {
   const [viewMessage, setViewMessage] = useState('');
   const [error, setError] = useState('');
   const [dataImportStatus, setDataImportStatus] = useState('');
+  const [csvWizard, setCsvWizard] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [basemapId, setBasemapId] = useState('positron');
   const [projection, setProjection] = useState('globe');
@@ -804,10 +808,34 @@ export default function App() {
   }
 
   async function handleImport(file) {
+    if (isCsvFile(file)) {
+      try {
+        setError('');
+        setDataImportStatus(`Reading ${file.name}…`);
+        const inspection = await inspectCsvFile(file);
+        setDataImportStatus('');
+        setCsvWizard({ file, inspection });
+        return { ok: true, pending: true };
+      } catch (caughtError) {
+        setDataImportStatus('');
+        setError(caughtError.message);
+        return { ok: false, error: caughtError.message };
+      }
+    }
+    return importFile(file);
+  }
+
+  async function handleCsvWizardImport(configuration) {
+    if (!csvWizard) return { ok: false, error: 'The CSV import is no longer available.' };
+    return importFile(csvWizard.file, configuration);
+  }
+
+  async function importFile(file, configuration = {}) {
     try {
       setError('');
       setDataImportStatus(`Reading ${file.name}…`);
       const collection = await readSpatialFile(file, {
+        csvMapping: configuration.mapping,
         geocodeAddresses: (addresses) => geocodeCsvAddresses(
           addresses,
           authSession?.accessToken,
@@ -823,7 +851,17 @@ export default function App() {
       );
       const name = spatialFileLayerName(file.name);
       setLayers((current) => {
-        const importedLayer = makeLayer(layerId, name, current.length);
+        const importedLayer = makeLayer(
+          layerId,
+          configuration.layerName || name,
+          current.length,
+        );
+        if (configuration.visualization) {
+          importedLayer.visualization = {
+            ...importedLayer.visualization,
+            ...configuration.visualization,
+          };
+        }
         if (collection.importReport?.type === 'csv') {
           importedLayer.importReport = collection.importReport;
         }
@@ -833,10 +871,11 @@ export default function App() {
       setSelectedFeatureIds([]);
       setFeatures(loaded.features);
       const geocoded = collection.importReport?.coordinateSource === 'geoapify';
-      setDataImportStatus(geocoded
+      const importMessage = geocoded
         ? `Added ${collection.importReport.importedRows.toLocaleString()} geocoded CSV rows.`
-        : 'Layer imported.');
-      return { ok: true };
+        : `Added ${collection.importReport?.importedRows?.toLocaleString() ?? collection.features.length.toLocaleString()} CSV rows.`;
+      setDataImportStatus(importMessage);
+      return { ok: true, message: importMessage };
     } catch (caughtError) {
       setDataImportStatus('');
       setError(caughtError.message);
@@ -1758,6 +1797,17 @@ export default function App() {
         onClose={closeTutorial}
         onNext={() => showTutorialStep(Math.min(5, tutorialStep + 1))}
       />}
+
+      {!viewerMode && csvWizard && (
+        <CsvImportWizard
+          fileName={csvWizard.file.name}
+          inspection={csvWizard.inspection}
+          signedIn={Boolean(authSession?.accessToken)}
+          status={dataImportStatus}
+          onCancel={() => setCsvWizard(null)}
+          onImport={handleCsvWizardImport}
+        />
+      )}
 
       {dragActive && (
         <div className="geojson-drop-overlay" aria-hidden="true">
