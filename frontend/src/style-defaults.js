@@ -34,11 +34,24 @@ const COMMON = {
 const THEMES = {
   positron: {
     feature: {
-      color: '#0067c5', opacity: 90, pointSize: 7, lineWidth: 4,
-      fillColor: '#4eb7e8', fillOpacity: 24,
-      borderColor: '#f8fbff', borderOpacity: 100,
-      pointBorderWidth: 2, lineBorderWidth: 2, polygonBorderWidth: 3,
-      glowEnabled: true, glowColor: '#e8f4f8', glowSize: 6, glowOpacity: 18,
+      color: '#4eb7e8',
+      opacity: 65,
+      pointSize: 7,
+      lineWidth: 4,
+
+      fillColor: '#4eb7e8',
+      fillOpacity: 24,
+
+      borderColor: '#f8fbff',
+      borderOpacity: 100,
+      pointBorderWidth: 2,
+      lineBorderWidth: 2,
+      polygonBorderWidth: 3,
+
+      glowEnabled: true,
+      glowColor: '#e8f4f8',
+      glowSize: 6,
+      glowOpacity: 18,
     },
     popup: {
       backgroundColor: '#f7fbfd', backgroundOpacity: 90, textColor: '#102d3a',
