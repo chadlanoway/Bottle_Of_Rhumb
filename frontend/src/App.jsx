@@ -161,7 +161,7 @@ export default function App() {
       hiddenLayerIds,
       selectedFeatureId,
     );
-    setMultiSelectedFeatures(mapRef.current, features, selectedFeatureIds);
+    setMultiSelectedFeatures(mapRef.current, features, selectedFeatureIds, hiddenLayerIds);
   }, [features, layers, selectedFeatureId, selectedFeatureIds]);
 
   useEffect(() => {
@@ -392,7 +392,7 @@ export default function App() {
         }
       }
 
-      setMultiSelectedFeatures(map, restoredFeatures, restoredSelection ?? []);
+      setMultiSelectedFeatures(map, restoredFeatures, restoredSelection ?? [], hiddenLayerIds);
 
       map.rhumbWeatherControl?.setFeatures(
         restoredFeatures,
@@ -1164,14 +1164,10 @@ export default function App() {
     });
   }
 
-  function handleToggleLayer(id) {
-    setLayers((current) => {
-      const next = current.map((layer) => (
-        layer.id === id ? { ...layer, visible: !layer.visible } : layer
-      ));
-      setHiddenLayers(drawRef.current, mapRef.current, drawingHiddenLayerIds(next));
-      return next;
-    });
+  function handleToggleLayer(id, visible) {
+    setLayers((current) => current.map((layer) => (
+      layer.id === id ? { ...layer, visible } : layer
+    )));
   }
 
   function handleDeleteFeature() {
@@ -1850,7 +1846,7 @@ export default function App() {
 function MapLegend({ legend, layers, features }) {
   if (!legend.visible) return null;
 
-  const entries = layers.filter((layer) => layer.visible && layer.showInLegend !== false);
+  const entries = layers.filter((layer) => layer.visible !== false && layer.showInLegend !== false);
   if (entries.length === 0) return null;
 
   return (

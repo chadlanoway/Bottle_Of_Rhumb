@@ -745,13 +745,17 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
   }
 }
 
-export function setMultiSelectedFeatures(map, features, selectedIds) {
+export function setMultiSelectedFeatures(map, features, selectedIds, hiddenLayerIds = []) {
   const source = map?.getSource(MULTI_SELECT_SOURCE);
   if (!source) return;
   const selected = new Set((selectedIds ?? []).map(String));
+  const hidden = new Set(hiddenLayerIds ?? []);
   source.setData({
     type: 'FeatureCollection',
-    features: (features ?? []).filter((feature) => selected.has(String(feature.id))),
+    features: (features ?? []).filter((feature) => (
+      selected.has(String(feature.id))
+      && !hidden.has(feature.properties?.layerId ?? 'default-layer')
+    )),
   });
 }
 

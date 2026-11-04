@@ -1419,14 +1419,18 @@ function LayersSection({
                 </button>
                 <span className="active-layer-dot" aria-hidden="true" />
                 <button
-                  className={`visibility-button ${layer.visible ? '' : 'is-hidden'}`}
+                  className={`visibility-button ${layer.visible !== false ? '' : 'is-hidden'}`}
                   type="button"
-                  title={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
-                  aria-label={layer.visible ? `Hide ${layer.name}` : `Show ${layer.name}`}
-                  aria-pressed={!layer.visible}
-                  onClick={() => onToggleLayer(layer.id)}
+                  title={layer.visible !== false ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                  aria-label={layer.visible !== false ? `Hide ${layer.name}` : `Show ${layer.name}`}
+                  aria-pressed={layer.visible === false}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onToggleLayer(layer.id, layer.visible === false);
+                  }}
                 >
-                  <EyeIcon hidden={!layer.visible} />
+                  <EyeIcon hidden={layer.visible === false} />
                 </button>
                 <button className="layer-select-button" type="button" title={`Make ${layer.name} the active drawing layer`} onClick={() => onLayerChange(layer.id)}>
                   <span className="layer-geometry" aria-hidden="true">◇</span>

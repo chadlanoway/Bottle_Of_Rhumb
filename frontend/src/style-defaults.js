@@ -139,7 +139,7 @@ const THEMES = {
 
   fiord: {
     feature: {
-      color: '#ff8a55', opacity: 100, pointSize: 8, lineWidth: 5,
+      color: '#ff8a55', opacity: 65, pointSize: 8, lineWidth: 5,
       fillColor: '#7ed6c4', fillOpacity: 27,
       borderColor: '#ffe5c7', borderOpacity: 100,
       pointBorderWidth: 2, lineBorderWidth: 2, polygonBorderWidth: 4,
@@ -157,7 +157,7 @@ const THEMES = {
 
   hiking: {
     feature: {
-      color: '#c94f24', opacity: 100, pointSize: 8, lineWidth: 4,
+      color: '#c94f24', opacity: 85, pointSize: 8, lineWidth: 4,
       fillColor: '#7f9a55', fillOpacity: 35,
       borderColor: '#4a3926', borderOpacity: 95,
       pointBorderWidth: 3, lineBorderWidth: 2, polygonBorderWidth: 3,

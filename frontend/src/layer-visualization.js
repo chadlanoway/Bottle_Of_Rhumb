@@ -42,6 +42,28 @@ export function drawingHiddenLayerIds(layers) {
     .map((layer) => layer.id);
 }
 
+export function setLayerVisualizationVisibility(map, layerId, visible) {
+  if (!map?.getLayer || layerId === null || layerId === undefined) return;
+
+  const id = safeId(layerId);
+  const visibility = visible ? 'visible' : 'none';
+  const suffixes = [
+    'heat',
+    'cluster-circles',
+    'cluster-count',
+    'cluster-points',
+    'choropleth-fill',
+    'choropleth-outline',
+  ];
+
+  for (const suffix of suffixes) {
+    const visualizationLayerId = `${PREFIX}${id}-${suffix}`;
+    if (map.getLayer(visualizationLayerId)) {
+      map.setLayoutProperty(visualizationLayerId, 'visibility', visibility);
+    }
+  }
+}
+
 export function numericFieldsForLayer(features, layerId, fallbackLayerId = 'default-layer') {
   const fields = new Map();
   const excluded = new Set([
@@ -132,7 +154,10 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
   const activeIds = new Set();
   for (const layer of layers ?? []) {
     const visualization = layerVisualization(layer);
-    if (!layer.visible || visualization.type === 'symbols') continue;
+    if (!layer.visible || visualization.type === 'symbols') {
+      setLayerVisualizationVisibility(map, layer.id, false);
+      continue;
+    }
 
     if (visualization.type === 'choropleth') {
       const polygonFeatures = (features ?? []).filter((feature) => (
@@ -142,6 +167,7 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
       if (polygonFeatures.length === 0 || !visualization.choroplethField) continue;
       activeIds.add(safeId(layer.id));
       syncChoropleth(map, layer, polygonFeatures, visualization);
+      setLayerVisualizationVisibility(map, layer.id, true);
       continue;
     }
 
@@ -157,6 +183,7 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
     } else if (visualization.type === 'clusters') {
       syncClusters(map, layer, pointFeatures, visualization);
     }
+    setLayerVisualizationVisibility(map, layer.id, true);
   }
 
   removeInactiveVisualizations(map, activeIds);
