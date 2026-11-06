@@ -1636,15 +1636,29 @@ export default function App() {
   const selectedFeatures = selectedFeatureIds
     .map((id) => features.find((feature) => String(feature.id) === String(id)))
     .filter(Boolean);
+  const editorTextColor = readableThemeTextColor(
+    legend.textColor,
+    legend.backgroundColor,
+  );
   const editorThemeStyle = {
     '--editor-panel-background': hexToRgba(
       legend.backgroundColor,
       legend.backgroundOpacity / 100,
     ),
-    '--editor-panel-color': legend.textColor,
-    '--editor-panel-muted': hexToRgba(legend.textColor, 0.72),
-    '--editor-panel-soft': hexToRgba(legend.textColor, 0.09),
-    '--editor-panel-hover': hexToRgba(legend.textColor, 0.15),
+    '--editor-panel-color': editorTextColor,
+    '--editor-panel-muted': hexToRgba(editorTextColor, 0.76),
+    '--editor-panel-soft': hexToRgba(editorTextColor, 0.09),
+    '--editor-panel-hover': hexToRgba(editorTextColor, 0.16),
+    '--editor-panel-card': mixHexColors(
+      legend.backgroundColor,
+      editorTextColor,
+      0.09,
+    ),
+    '--editor-panel-card-strong': mixHexColors(
+      legend.backgroundColor,
+      editorTextColor,
+      0.15,
+    ),
     '--editor-panel-border': hexToRgba(
       legend.borderColor,
       legend.borderOpacity / 100,
@@ -1680,6 +1694,10 @@ export default function App() {
       {!viewerMode && (
         <>
           <AppHeader
+            authSession={authSession}
+            onCreateAccount={() => handleSignIn('signup')}
+            onSignIn={() => handleSignIn('login')}
+            onSignOut={() => signOut()}
             onStartTutorial={() => showTutorialStep(0)}
             tutorialActive={tutorialStep !== null}
           />
@@ -1934,6 +1952,53 @@ function hexToRgba(hex, opacity) {
   const green = Number.parseInt(normalized.slice(2, 4), 16);
   const blue = Number.parseInt(normalized.slice(4, 6), 16);
   return `rgba(${red}, ${green}, ${blue}, ${Math.min(1, Math.max(0, opacity))})`;
+}
+
+function readableThemeTextColor(preferredColor, backgroundColor) {
+  if (contrastRatio(preferredColor, backgroundColor) >= 4.5) return preferredColor;
+  const dark = '#10242e';
+  const light = '#f4f8fa';
+  return contrastRatio(dark, backgroundColor) >= contrastRatio(light, backgroundColor)
+    ? dark
+    : light;
+}
+
+function contrastRatio(first, second) {
+  const firstLuminance = relativeLuminance(first);
+  const secondLuminance = relativeLuminance(second);
+  const lighter = Math.max(firstLuminance, secondLuminance);
+  const darker = Math.min(firstLuminance, secondLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function relativeLuminance(hex) {
+  const channels = hexToRgb(hex).map((channel) => {
+    const value = channel / 255;
+    return value <= 0.03928
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+}
+
+function mixHexColors(background, foreground, foregroundWeight) {
+  const backgroundRgb = hexToRgb(background);
+  const foregroundRgb = hexToRgb(foreground);
+  const weight = Math.max(0, Math.min(1, foregroundWeight));
+  const channels = backgroundRgb.map((channel, index) => (
+    Math.round(channel * (1 - weight) + foregroundRgb[index] * weight)
+  ));
+  return `rgb(${channels.join(', ')})`;
+}
+
+function hexToRgb(hex) {
+  const clean = String(hex || '#000000').replace('#', '');
+  const expanded = clean.length === 3
+    ? clean.split('').map((character) => character + character).join('')
+    : clean.padEnd(6, '0').slice(0, 6);
+  const value = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(value)) return [0, 0, 0];
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
 }
 
 function hasFileTransfer(event) {

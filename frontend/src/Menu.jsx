@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FaGithub } from 'react-icons/fa';
+import { FaGithub, FaUserCircle } from 'react-icons/fa';
 import {
   CHOROPLETH_RAMPS,
   buildChoroplethClasses,
@@ -39,7 +39,36 @@ const ROUTE_PROFILES = [
 
 const geometryIcon = { Point: '●', LineString: '╱', Polygon: '⬡' };
 
-export function AppHeader({ onStartTutorial, tutorialActive = false }) {
+export function AppHeader({
+  authSession,
+  onCreateAccount,
+  onSignIn,
+  onSignOut,
+  onStartTutorial,
+  tutorialActive = false,
+}) {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+
+    function closeAccountMenu(event) {
+      if (!accountMenuRef.current?.contains(event.target)) setAccountMenuOpen(false);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setAccountMenuOpen(false);
+    }
+
+    document.addEventListener('pointerdown', closeAccountMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', closeAccountMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [accountMenuOpen]);
+
   return (
     <header className="app-header">
       <div className="app-title">
@@ -58,6 +87,39 @@ export function AppHeader({ onStartTutorial, tutorialActive = false }) {
         >
           <FaGithub aria-hidden="true" />
         </a>
+
+        <div className="header-account" ref={accountMenuRef}>
+          <button
+            className={`header-account-button ${authSession ? 'is-signed-in' : ''}`}
+            type="button"
+            title={authSession ? 'Open account menu' : 'Sign in or create an account'}
+            aria-label={authSession ? 'Open account menu' : 'Sign in or create an account'}
+            aria-expanded={accountMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setAccountMenuOpen((open) => !open)}
+          >
+            <FaUserCircle aria-hidden="true" />
+            {authSession && <span className="account-status-dot" aria-hidden="true" />}
+          </button>
+
+          {accountMenuOpen && (
+            <div className="header-account-menu" role="menu">
+              {authSession ? (
+                <>
+                  <span className="header-account-email" title={authSession.email}>
+                    {authSession.email || 'Signed in'}
+                  </span>
+                  <button type="button" role="menuitem" onClick={onSignOut}>Sign out</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" role="menuitem" onClick={onSignIn}>Sign in</button>
+                  <button type="button" role="menuitem" onClick={onCreateAccount}>Make a password</button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         <button
           className={`header-tutorial-button ${tutorialActive ? 'is-active' : ''}`}
@@ -529,7 +591,7 @@ function ShareSection({
           <strong>Sign in to save maps</strong>
           <p>Drafts are private. Published maps can be opened by anyone with the link.</p>
           <button className="primary-map-button" type="button" onClick={onSignIn}>Sign in</button>
-          <button className="secondary-button" type="button" onClick={onCreateAccount}>Create account</button>
+          <button className="secondary-button" type="button" onClick={onCreateAccount}>Make a password</button>
         </div>
       ) : (
         <>

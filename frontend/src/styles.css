@@ -118,10 +118,12 @@ select:focus-visible {
 }
 
 .header-actions {
+  position: relative;
   gap: 8px;
 }
 
 .header-link,
+.header-account-button,
 .donate-button {
   min-height: 30px;
   padding: 4px 10px;
@@ -131,6 +133,102 @@ select:focus-visible {
   color: #eef5f8;
   text-decoration: none;
   font-weight: 600;
+}
+
+.header-link,
+.header-account-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  place-items: center;
+  cursor: pointer;
+}
+
+.header-link svg,
+.header-account-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.header-account {
+  position: relative;
+}
+
+.header-account-button {
+  position: relative;
+  font: inherit;
+}
+
+.header-account-button:hover,
+.header-account-button:focus-visible,
+.header-link:hover,
+.header-link:focus-visible {
+  border-color: #7896ad;
+  background: rgba(255, 255, 255, .12);
+  outline: none;
+}
+
+.header-account-button:focus-visible,
+.header-link:focus-visible {
+  box-shadow: 0 0 0 2px #111b21, 0 0 0 4px #8bbce2;
+}
+
+.account-status-dot {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #111b21;
+  border-radius: 50%;
+  background: #53d68b;
+}
+
+.header-account-menu {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 9px);
+  right: 0;
+  display: grid;
+  width: 190px;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid #4e6878;
+  border-radius: 8px;
+  background: #15242d;
+  color: #f1f6f8;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .38);
+}
+
+.header-account-menu button {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.header-account-menu button:hover,
+.header-account-menu button:focus-visible {
+  border-color: #58788d;
+  background: #223b4a;
+  outline: none;
+}
+
+.header-account-email {
+  overflow: hidden;
+  padding: 6px 9px 8px;
+  border-bottom: 1px solid #405561;
+  color: #b9cad3;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-link.is-placeholder,
@@ -3659,16 +3757,17 @@ button:disabled {
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
   border-radius: 8px;
-  background: rgba(255, 255, 255, .045);
+  background: var(--editor-panel-card, rgba(255, 255, 255, .09));
+  color: var(--editor-panel-color, #eef5f8);
 }
 
 .share-signin-card p,
 .share-note,
 .share-status {
   margin: 0;
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   font-size: .78rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -3692,10 +3791,10 @@ button:disabled {
 .share-account-row button,
 .share-copy-row button,
 .share-output-card > button {
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
   border-radius: 6px;
-  background: rgba(255, 255, 255, .08);
-  color: white;
+  background: var(--editor-panel-card-strong, rgba(255, 255, 255, .12));
+  color: var(--editor-panel-color, #eef5f8);
   padding: 7px 9px;
   cursor: pointer;
 }
@@ -3704,9 +3803,10 @@ button:disabled {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
   border-radius: 8px;
-  background: rgba(255, 255, 255, .035);
+  background: var(--editor-panel-card, rgba(255, 255, 255, .09));
+  color: var(--editor-panel-color, #eef5f8);
 }
 
 .my-maps-card .section-label {
@@ -3724,9 +3824,9 @@ button:disabled {
   display: flex;
   width: 100%;
   align-items: center;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
   border-radius: 6px;
-  background: rgba(255, 255, 255, .055);
+  background: var(--editor-panel-card-strong, rgba(255, 255, 255, .13));
   overflow: hidden;
 }
 
@@ -3740,7 +3840,7 @@ button:disabled {
   padding: 8px 9px;
   border: 0;
   background: transparent;
-  color: white;
+  color: var(--editor-panel-color, #eef5f8);
   cursor: pointer;
   text-align: left;
 }
@@ -3748,16 +3848,16 @@ button:disabled {
 .my-map-row:hover,
 .my-map-row.is-current {
   border-color: var(--blue);
-  background: rgba(30, 144, 255, .14);
+  background: color-mix(in srgb, var(--blue) 18%, var(--editor-panel-card-strong));
 }
 
 .my-map-delete-button {
   align-self: stretch;
   flex: 0 0 36px;
   border: 0;
-  border-left: 1px solid var(--panel-border);
-  background: rgba(0, 0, 0, .12);
-  color: #ffb3b3;
+  border-left: 1px solid var(--editor-panel-border, var(--panel-border));
+  background: var(--editor-panel-card, rgba(0, 0, 0, .12));
+  color: #d94b4b;
   cursor: pointer;
 }
 
@@ -3780,7 +3880,7 @@ button:disabled {
 
 .my-maps-list small,
 .my-maps-list em {
-  color: var(--muted);
+  color: var(--editor-panel-muted, var(--muted));
   font-size: .68rem;
   font-style: normal;
 }
