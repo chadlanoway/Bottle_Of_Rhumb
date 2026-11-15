@@ -56,6 +56,7 @@ import {
   deleteMap as deleteSavedMap,
   listMaps as listSavedMaps,
   loadMap as loadSavedMap,
+  regenerateMapPreview,
   updateMap as updateSavedMap,
 } from './map-storage.js';
 import { DEFAULT_STYLE, getBasemapStyleDefaults } from './style-defaults.js';
@@ -132,6 +133,13 @@ export default function App() {
   const [mapTitle, setMapTitle] = useState('Untitled map');
   const [mapDescription, setMapDescription] = useState('');
   const [mapVisibility, setMapVisibility] = useState('draft');
+  const [mapPreview, setMapPreview] = useState({
+    previewStatus: 'none',
+    previewUrl: '',
+    previewRevision: null,
+    previewUpdatedAt: null,
+    previewError: '',
+  });
   const [saveStatus, setSaveStatus] = useState('');
   const [myMaps, setMyMaps] = useState([]);
   const [myMapsStatus, setMyMapsStatus] = useState('');
@@ -151,6 +159,11 @@ export default function App() {
   const viewerMode = Boolean(query.get('map'))
     && (query.get('view') === '1' || query.get('embed') === '1');
   const embedMode = query.get('embed') === '1';
+  const captureMode = query.get('capture') === '1';
+
+  useEffect(() => {
+    if (captureMode) window.__RHUMB_SCREENSHOT_READY__ = false;
+  }, [captureMode]);
 
   useEffect(() => {
     const hiddenLayerIds = drawingHiddenLayerIds(layers);
@@ -288,6 +301,7 @@ export default function App() {
         setMapTitle(document.title || 'Untitled map');
         setMapDescription(document.description || '');
         setMapVisibility(document.visibility || 'draft');
+        setMapPreview(previewFromMap(document));
 
         mountMap(
           document.basemapId || 'positron',
@@ -322,6 +336,39 @@ export default function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      !mapId
+      || mapVisibility !== 'published'
+      || !['pending', 'processing'].includes(mapPreview.previewStatus)
+    ) return undefined;
+    let cancelled = false;
+    let timeoutId;
+    let attempts = 0;
+
+    async function pollPreview() {
+      if (cancelled || attempts >= 40) return;
+      attempts += 1;
+      try {
+        const loaded = await loadSavedMap(mapId, authSession?.accessToken);
+        if (cancelled) return;
+        const nextPreview = previewFromMap(loaded.map);
+        setMapPreview(nextPreview);
+        if (nextPreview.previewStatus === 'pending' || nextPreview.previewStatus === 'processing') {
+          timeoutId = window.setTimeout(pollPreview, 2500);
+        }
+      } catch {
+        if (!cancelled) timeoutId = window.setTimeout(pollPreview, 4000);
+      }
+    }
+
+    timeoutId = window.setTimeout(pollPreview, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [mapId, mapRevision, mapVisibility, mapPreview.previewStatus, authSession?.accessToken]);
 
   function mountMap(
     nextBasemapId,
@@ -401,6 +448,17 @@ export default function App() {
       );
       if (restoredView) previewMapView(map, restoredView);
       setMapReady(true);
+      if (captureMode) {
+        const markCaptureReady = () => {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              window.__RHUMB_SCREENSHOT_READY__ = true;
+            });
+          });
+        };
+        if (map.loaded() && map.areTilesLoaded()) markCaptureReady();
+        else map.once('idle', markCaptureReady);
+      }
     });
 
     map.on('error', (event) => {
@@ -1416,6 +1474,7 @@ export default function App() {
       setMapRevision(saved.revision);
       setOwnsMap(true);
       setMapVisibility(saved.visibility);
+      setMapPreview(previewFromMap(saved));
       setSaveStatus(saved.visibility === 'published'
         ? 'Map saved and published.'
         : 'Draft saved.');
@@ -1430,6 +1489,18 @@ export default function App() {
       setMyMapsStatus(maps.length === 0 ? 'No saved maps yet.' : '');
     } catch (caughtError) {
       setSaveStatus(caughtError.message || 'The map could not be saved.');
+    }
+  }
+
+  async function handleRegeneratePreview() {
+    if (!authSession?.accessToken || !mapId) return;
+    setSaveStatus('Requesting a new social preview…');
+    try {
+      const preview = await regenerateMapPreview(mapId, authSession.accessToken);
+      setMapPreview(previewFromMap(preview));
+      setSaveStatus('Social preview requested.');
+    } catch (caughtError) {
+      setSaveStatus(caughtError.message || 'The social preview could not be requested.');
     }
   }
 
@@ -1640,6 +1711,9 @@ export default function App() {
     legend.textColor,
     legend.backgroundColor,
   );
+  const editorDangerColor = relativeLuminance(legend.backgroundColor) > 0.48
+    ? '#a62020'
+    : '#ff9b94';
   const editorThemeStyle = {
     '--editor-panel-background': hexToRgba(
       legend.backgroundColor,
@@ -1666,6 +1740,10 @@ export default function App() {
     '--editor-panel-border-width': `${legend.borderWidth}px`,
     '--editor-panel-radius': `${legend.borderRadius}px`,
     '--editor-panel-font': legendFontFamily(legend.fontFamily),
+    '--editor-danger': editorDangerColor,
+    '--editor-danger-background': hexToRgba(editorDangerColor, 0.12),
+    '--editor-danger-background-hover': hexToRgba(editorDangerColor, 0.24),
+    '--editor-danger-border': hexToRgba(editorDangerColor, 0.58),
     '--editor-panel-shadow': legend.glowEnabled
       ? `0 0 ${legend.glowSize}px ${legend.glowColor}, 0 14px 38px rgba(0,0,0,.35)`
       : '0 14px 38px rgba(0,0,0,.35)',
@@ -1673,7 +1751,7 @@ export default function App() {
 
   return (
     <main
-      className={`app-shell ${dragActive ? 'is-dragging-file' : ''} ${viewerMode ? 'is-viewer' : ''} ${embedMode ? 'is-embed' : ''}`}
+      className={`app-shell ${dragActive ? 'is-dragging-file' : ''} ${viewerMode ? 'is-viewer' : ''} ${embedMode ? 'is-embed' : ''} ${captureMode ? 'is-capture' : ''}`}
       style={editorThemeStyle}
       onDragEnter={viewerMode ? undefined : handleDragEnter}
       onDragLeave={viewerMode ? undefined : handleDragLeave}
@@ -1745,6 +1823,7 @@ export default function App() {
         mapId={mapId}
         mapTitle={mapTitle}
         mapVisibility={mapVisibility}
+        mapPreview={mapPreview}
         myMaps={myMaps}
         myMapsStatus={myMapsStatus}
         ownsMap={ownsMap}
@@ -1781,6 +1860,7 @@ export default function App() {
         onMapVisibilityChange={setMapVisibility}
         onDeleteSavedMap={handleDeleteSavedMap}
         onOpenSavedMap={handleOpenSavedMap}
+        onRegeneratePreview={handleRegeneratePreview}
         onSaveMap={handleSaveMap}
         onSignIn={() => handleSignIn('login')}
         onSignOut={() => signOut()}
@@ -1944,6 +2024,16 @@ function legendFontFamily(font) {
   if (font === 'serif') return 'Georgia, serif';
   if (font === 'mono') return 'Consolas, "Courier New", monospace';
   return 'Arial, Helvetica, sans-serif';
+}
+
+function previewFromMap(value = {}) {
+  return {
+    previewStatus: value.previewStatus || 'none',
+    previewUrl: value.previewUrl || '',
+    previewRevision: value.previewRevision || null,
+    previewUpdatedAt: value.previewUpdatedAt || null,
+    previewError: value.previewError || '',
+  };
 }
 
 function hexToRgba(hex, opacity) {

@@ -1120,16 +1120,27 @@ select:focus-visible {
   height: 25px;
   padding: 3px;
   place-items: center;
-  border: 0;
+  border: 1px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
   border-radius: 5px;
-  background: transparent;
-  color: #9dafb8;
+  background: var(--editor-danger-background, rgba(166, 32, 32, .12));
+  color: var(--editor-danger, #a62020);
   cursor: pointer;
 }
 
-.delete-layer-icon:hover:not(:disabled) {
-  background: rgba(170, 40, 40, .25);
-  color: #ffb4b4;
+.delete-layer-icon:hover:not(:disabled),
+.delete-layer-icon:focus-visible {
+  background: var(--editor-danger-background-hover, rgba(166, 32, 32, .24));
+  color: var(--editor-danger, #a62020);
+  outline: 2px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
+  outline-offset: 1px;
+}
+
+.delete-layer-icon:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: var(--editor-panel-muted, #9dafb8);
+  cursor: not-allowed;
+  opacity: .42;
 }
 
 .delete-layer-icon svg {
@@ -1845,15 +1856,20 @@ select:focus-visible {
 
 .delete-feature-button {
   padding: 5px 9px;
-  border: 1px solid rgba(255, 110, 110, .4);
+  border: 1px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
   border-radius: 5px;
-  background: rgba(170, 40, 40, .12);
-  color: #ffb4b4;
+  background: var(--editor-danger-background, rgba(166, 32, 32, .12));
+  color: var(--editor-danger, #a62020);
   cursor: pointer;
+  font-weight: 700;
 }
 
-.delete-feature-button:hover {
-  background: rgba(170, 40, 40, .25);
+.delete-feature-button:hover,
+.delete-feature-button:focus-visible {
+  background: var(--editor-danger-background-hover, rgba(166, 32, 32, .24));
+  color: var(--editor-danger, #a62020);
+  outline: 2px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
+  outline-offset: 1px;
 }
 
 .secondary-button {
@@ -3856,14 +3872,17 @@ button:disabled {
   flex: 0 0 36px;
   border: 0;
   border-left: 1px solid var(--editor-panel-border, var(--panel-border));
-  background: var(--editor-panel-card, rgba(0, 0, 0, .12));
-  color: #d94b4b;
+  background: var(--editor-danger-background, rgba(166, 32, 32, .12));
+  color: var(--editor-danger, #a62020);
   cursor: pointer;
 }
 
-.my-map-delete-button:hover {
-  background: rgba(205, 60, 60, .28);
-  color: white;
+.my-map-delete-button:hover,
+.my-map-delete-button:focus-visible {
+  background: var(--editor-danger-background-hover, rgba(166, 32, 32, .24));
+  color: var(--editor-danger, #a62020);
+  outline: 2px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
+  outline-offset: -3px;
 }
 
 .my-maps-list span {
@@ -3999,6 +4018,51 @@ button:disabled {
 .share-output-card a {
   color: #7ebcff;
   font-size: .82rem;
+}
+
+.social-preview-card {
+  display: grid;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--editor-panel-border, var(--panel-border));
+  border-radius: 8px;
+  background: var(--editor-panel-card-strong, rgba(255, 255, 255, .12));
+}
+
+.social-preview-card img,
+.social-preview-placeholder {
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.social-preview-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border: 1px dashed var(--editor-panel-border, var(--panel-border));
+  background: var(--editor-panel-soft, rgba(255, 255, 255, .06));
+  color: var(--editor-panel-muted, var(--muted));
+  text-align: center;
+}
+
+.social-preview-status {
+  display: grid;
+  gap: 2px;
+  color: var(--editor-panel-color, #eef5f8);
+  font-size: .76rem;
+}
+
+.social-preview-status small {
+  color: var(--editor-danger, #d94b4b);
+  overflow-wrap: anywhere;
+}
+
+.share-copy-row button:disabled,
+.share-output-card > button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
 }
 
 .share-embed-label {

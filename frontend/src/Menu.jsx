@@ -9,6 +9,7 @@ import {
   layerVisualization,
   numericFieldsForLayer,
 } from './layer-visualization.js';
+import { mapShareUrl } from './map-storage.js';
 
 const DRAW_ACTIONS = [
   { type: 'select', label: 'Select', icon: '↖', help: 'Select, move, and edit existing features.' },
@@ -371,6 +372,7 @@ export default function Menu({
   mapId,
   mapTitle,
   mapVisibility,
+  mapPreview,
   myMaps,
   myMapsStatus,
   ownsMap,
@@ -407,6 +409,7 @@ export default function Menu({
   onMapVisibilityChange,
   onDeleteSavedMap,
   onOpenSavedMap,
+  onRegeneratePreview,
   onSaveMap,
   onSignIn,
   onSignOut,
@@ -524,6 +527,7 @@ export default function Menu({
               mapId={mapId}
               mapTitle={mapTitle}
               mapVisibility={mapVisibility}
+              mapPreview={mapPreview}
               myMaps={myMaps}
               myMapsStatus={myMapsStatus}
               ownsMap={ownsMap}
@@ -534,6 +538,7 @@ export default function Menu({
               onMapVisibilityChange={onMapVisibilityChange}
               onDeleteSavedMap={onDeleteSavedMap}
               onOpenSavedMap={onOpenSavedMap}
+              onRegeneratePreview={onRegeneratePreview}
               onSaveMap={onSaveMap}
               onSignIn={onSignIn}
               onSignOut={onSignOut}
@@ -552,6 +557,7 @@ function ShareSection({
   mapId,
   mapTitle,
   mapVisibility,
+  mapPreview,
   myMaps,
   myMapsStatus,
   ownsMap,
@@ -562,6 +568,7 @@ function ShareSection({
   onMapVisibilityChange,
   onDeleteSavedMap,
   onOpenSavedMap,
+  onRegeneratePreview,
   onSaveMap,
   onSignIn,
   onSignOut,
@@ -569,6 +576,10 @@ function ShareSection({
   const [copyMessage, setCopyMessage] = useState('');
   const viewerUrl = mapId ? makeMapUrl(mapId, 'view') : '';
   const embedUrl = mapId ? makeMapUrl(mapId, 'embed') : '';
+  const socialShareUrl = mapId ? mapShareUrl(mapId) : '';
+  const previewStatus = mapPreview?.previewStatus || 'none';
+  const previewReady = previewStatus === 'ready' && Boolean(mapPreview?.previewUrl);
+  const previewBusy = previewStatus === 'pending' || previewStatus === 'processing';
   const embedCode = embedUrl
     ? `<iframe src="${embedUrl}" title="${escapeAttribute(mapTitle || 'Interactive map')}" width="100%" height="600" loading="lazy" allowfullscreen></iframe>`
     : '';
@@ -687,6 +698,49 @@ function ShareSection({
 
       {mapId && mapVisibility === 'published' && (
         <div className="share-output-card">
+          <p className="section-label">Facebook and social preview</p>
+          <div className={`social-preview-card is-${previewStatus}`}>
+            {previewReady ? (
+              <img
+                src={mapPreview.previewUrl}
+                alt={`Social preview for ${mapTitle || 'this map'}`}
+              />
+            ) : (
+              <div className="social-preview-placeholder" role="status">
+                {previewBusy ? 'Generating map preview…' : 'No preview is available yet.'}
+              </div>
+            )}
+            <div className="social-preview-status">
+              <strong>{previewStatusLabel(previewStatus)}</strong>
+              {mapPreview?.previewError && <small>{mapPreview.previewError}</small>}
+            </div>
+          </div>
+          <div className="share-copy-row">
+            <input
+              readOnly
+              value={socialShareUrl}
+              aria-label="Facebook and social sharing URL"
+            />
+            <button
+              type="button"
+              disabled={!previewReady}
+              onClick={() => copy(socialShareUrl, 'Social link')}
+            >
+              Copy
+            </button>
+          </div>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={previewBusy || !ownsMap}
+            onClick={onRegeneratePreview}
+          >
+            {previewBusy ? 'Generating preview…' : 'Regenerate social preview'}
+          </button>
+          <p className="share-note">
+            Use this link on Facebook or other services that read Open Graph metadata.
+          </p>
+
           <p className="section-label">Published viewer link</p>
           <div className="share-copy-row">
             <input readOnly value={viewerUrl} aria-label="Published map URL" />
@@ -713,6 +767,14 @@ function ShareSection({
       )}
     </div>
   );
+}
+
+function previewStatusLabel(status) {
+  if (status === 'ready') return 'Preview ready';
+  if (status === 'pending') return 'Preview queued';
+  if (status === 'processing') return 'Rendering preview';
+  if (status === 'failed') return 'Preview failed';
+  return 'Preview not generated';
 }
 
 function makeMapUrl(mapId, mode) {
@@ -1396,17 +1458,19 @@ function LayersSection({
           width: 30px;
           padding: 0;
           place-items: center;
-          border: 1px solid transparent;
-          background: transparent;
-          color: #8fa5b0;
+          border: 1px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
+          border-radius: 5px;
+          background: var(--editor-danger-background, rgba(166, 32, 32, .12));
+          color: var(--editor-danger, #a62020);
         }
 
         .feature-list .delete-feature-icon:hover,
         .feature-list .delete-feature-icon:focus-visible {
-          border-color: rgba(224, 108, 91, .55);
-          background: rgba(224, 108, 91, .16);
-          color: #ff9a89;
-          outline: none;
+          border-color: var(--editor-danger-border, rgba(166, 32, 32, .58));
+          background: var(--editor-danger-background-hover, rgba(166, 32, 32, .24));
+          color: var(--editor-danger, #a62020);
+          outline: 2px solid var(--editor-danger-border, rgba(166, 32, 32, .58));
+          outline-offset: 1px;
         }
 
         .feature-list .delete-feature-icon svg {

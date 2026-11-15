@@ -50,6 +50,20 @@ export async function deleteMap(mapId, accessToken) {
   });
 }
 
+export async function regenerateMapPreview(mapId, accessToken) {
+  requireToken(accessToken);
+  const response = await request(`/maps/${encodeURIComponent(mapId)}/preview`, {
+    method: 'POST',
+    accessToken,
+  });
+  return response.payload.preview || {};
+}
+
+export function mapShareUrl(mapId) {
+  requireApi();
+  return `${MAPS_API_URL}/share/${encodeURIComponent(mapId)}`;
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${MAPS_API_URL}${path}`, {
     method: options.method || 'GET',
