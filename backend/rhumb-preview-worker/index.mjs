@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { mkdir } from 'node:fs/promises';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
@@ -44,15 +45,29 @@ export async function handler(event) {
   await updateStatus(mapId, revision, previewToken, 'processing');
   let browser;
   try {
+    await mkdir('/tmp/.cache/fontconfig', { recursive: true });
+
     browser = await chromium.launch({
       headless: true,
+      env: {
+        ...process.env,
+        HOME: '/tmp',
+        XDG_CACHE_HOME: '/tmp/.cache',
+        XDG_CONFIG_HOME: '/tmp/.config',
+      },
       args: [
         '--disable-dev-shm-usage',
+        '--disable-gpu-sandbox',
         '--disable-setuid-sandbox',
+        '--enable-unsafe-swiftshader',
         '--enable-webgl',
         '--ignore-gpu-blocklist',
+        '--in-process-gpu',
         '--no-sandbox',
-        '--use-gl=swiftshader',
+        '--no-zygote',
+        '--single-process',
+        '--use-angle=swiftshader',
+        '--use-gl=angle',
       ],
     });
 

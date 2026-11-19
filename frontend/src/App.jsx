@@ -89,6 +89,43 @@ const WATER_ROUTING_API_URL = import.meta.env.VITE_WATER_ROUTING_API_URL ?? '';
 const IMAGE_UPLOAD_API_URL = import.meta.env.VITE_IMAGE_UPLOAD_API_URL ?? '';
 const TUTORIAL_LAYER_ID = 'bottle-of-rhumb-tutorial';
 const TUTORIAL_CENTER = [-87.72, 43.27];
+const AUTH_RETURN_DRAFT_KEY = 'rhumb-auth-return-draft-v1';
+const AUTH_RETURN_DRAFT_MAX_AGE_MS = 60 * 60 * 1000;
+
+function saveAuthReturnDraft(draft) {
+  try {
+    window.sessionStorage.setItem(AUTH_RETURN_DRAFT_KEY, JSON.stringify({
+      version: 1,
+      savedAt: Date.now(),
+      ...draft,
+    }));
+  } catch {
+    throw new Error(
+      'This map could not be preserved for sign-in because browser storage is unavailable. '
+      + 'Keep this tab open and enable browser storage before trying again.',
+    );
+  }
+}
+
+function takeAuthReturnDraft() {
+  let draft = null;
+  try {
+    const value = window.sessionStorage.getItem(AUTH_RETURN_DRAFT_KEY);
+    window.sessionStorage.removeItem(AUTH_RETURN_DRAFT_KEY);
+    draft = value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+
+  if (
+    draft?.version !== 1
+    || !draft.document
+    || !Number.isFinite(draft.savedAt)
+    || Date.now() - draft.savedAt > AUTH_RETURN_DRAFT_MAX_AGE_MS
+  ) return null;
+
+  return draft;
+}
 
 export default function App() {
   const mapContainerRef = useRef(null);
@@ -256,6 +293,63 @@ export default function App() {
         setAuthSession(session);
       } catch (caughtError) {
         if (!cancelled) setError(caughtError.message);
+      }
+
+      const authReturnDraft = takeAuthReturnDraft();
+      if (authReturnDraft) {
+        const document = authReturnDraft.document;
+        const restoredLayers = document.layers?.length
+          ? document.layers
+          : [DEFAULT_LAYER];
+        const restoredFeatures = document.featureCollection?.features ?? [];
+        const restoredActiveLayerId = restoredLayers.some(
+          (layer) => layer.id === document.activeLayerId,
+        )
+          ? document.activeLayerId
+          : restoredLayers[0].id;
+        const restoredSelection = Array.isArray(authReturnDraft.selectedFeatureIds)
+          ? authReturnDraft.selectedFeatureIds
+          : [];
+        const restoredBasemapId = document.basemapId || 'positron';
+        const restoredProjection = document.projection === 'globe' ? 'globe' : 'mercator';
+        const restoredStyleDefaults = getBasemapStyleDefaults(restoredBasemapId);
+
+        activeLayerIdRef.current = restoredActiveLayerId;
+        setActiveLayerId(restoredActiveLayerId);
+        setLayers(restoredLayers);
+        setFeatures(restoredFeatures);
+        setSelectedFeatureIds(restoredSelection);
+        setBasemapId(restoredBasemapId);
+        setProjection(restoredProjection);
+        setSavedView(document.view || null);
+        setLegend((current) => ({
+          ...current,
+          ...restoredStyleDefaults.legend,
+          ...(document.legend ?? {}),
+        }));
+        setMapControls({
+          ...restoredStyleDefaults.controls,
+          ...(document.mapControls ?? {}),
+        });
+        setMapId(authReturnDraft.mapId || null);
+        setMapRevision(authReturnDraft.mapRevision || document.revision || 0);
+        setOwnsMap(Boolean(authReturnDraft.ownsMap));
+        setMapTitle(document.title || 'Untitled map');
+        setMapDescription(document.description || '');
+        setMapVisibility(document.visibility || 'draft');
+        setMapPreview(authReturnDraft.mapPreview || previewFromMap(document));
+        setSaveStatus('Your unsaved map was restored after sign-in.');
+        setDataImportStatus('Unsaved map restored after sign-in.');
+
+        mountMap(
+          restoredBasemapId,
+          restoredFeatures,
+          restoredLayers,
+          restoredSelection,
+          document.view || null,
+          restoredProjection,
+        );
+        return;
       }
 
       const requestedMapId = new URLSearchParams(window.location.search).get('map');
@@ -1533,6 +1627,14 @@ export default function App() {
 
   async function handleSignIn(mode = 'login') {
     try {
+      saveAuthReturnDraft({
+        document: buildSavedDocument(),
+        mapId,
+        mapRevision,
+        ownsMap,
+        mapPreview,
+        selectedFeatureIds,
+      });
       await signIn(mode);
     } catch (caughtError) {
       setError(caughtError.message);
