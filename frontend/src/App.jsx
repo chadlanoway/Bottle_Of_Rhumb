@@ -64,6 +64,7 @@ import {
   DEFAULT_LAYER_VISUALIZATION,
   buildChoroplethClasses,
   drawingHiddenLayerIds,
+  drawingVisualizationLayers,
   layerVisualization,
   removeLayerVisualizations,
   syncLayerVisualizations,
@@ -204,7 +205,7 @@ export default function App() {
 
   useEffect(() => {
     const hiddenLayerIds = drawingHiddenLayerIds(layers);
-    setHiddenLayers(drawRef.current, mapRef.current, hiddenLayerIds);
+    setHiddenLayers(drawRef.current, mapRef.current, hiddenLayerIds, drawingVisualizationLayers(layers));
     syncLayerVisualizations(mapRef.current, layers, features, layers[0]?.id);
     mapRef.current?.rhumbWeatherControl?.setFeatures(
       features,
@@ -521,7 +522,7 @@ export default function App() {
       }
 
       const hiddenLayerIds = drawingHiddenLayerIds(restoredLayers);
-      setHiddenLayers(draw, map, hiddenLayerIds);
+      setHiddenLayers(draw, map, hiddenLayerIds, drawingVisualizationLayers(restoredLayers));
       syncLayerVisualizations(map, restoredLayers, restoredFeatures, restoredLayers[0]?.id);
 
       const restoredPrimary = restoredSelection?.at?.(-1) ?? restoredSelection ?? null;
@@ -1400,6 +1401,7 @@ export default function App() {
       drawRef.current,
       mapRef.current,
       drawingHiddenLayerIds(nextLayers),
+      drawingVisualizationLayers(nextLayers),
     );
   }
 
@@ -1798,6 +1800,7 @@ export default function App() {
         drawRef.current,
         mapRef.current,
         drawingHiddenLayerIds(nextLayers),
+        drawingVisualizationLayers(nextLayers),
       );
     }
   }

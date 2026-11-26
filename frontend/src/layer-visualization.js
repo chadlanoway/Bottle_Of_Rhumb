@@ -38,8 +38,18 @@ export function layerVisualization(layer) {
 
 export function drawingHiddenLayerIds(layers) {
   return (layers ?? [])
-    .filter((layer) => !layer.visible || layerVisualization(layer).type !== 'symbols')
+    .filter((layer) => !layer.visible)
     .map((layer) => layer.id);
+}
+
+export function drawingVisualizationLayers(layers) {
+  const result = { Point: [], Polygon: [] };
+  for (const layer of layers ?? []) {
+    const { type, choroplethField } = layerVisualization(layer);
+    if (type === 'heatmap' || type === 'clusters') result.Point.push(layer.id);
+    if (type === 'choropleth' && choroplethField) result.Polygon.push(layer.id);
+  }
+  return result;
 }
 
 export function setLayerVisualizationVisibility(map, layerId, visible) {
@@ -174,6 +184,7 @@ export function syncLayerVisualizations(map, layers, features, fallbackLayerId =
     const pointFeatures = (features ?? []).filter((feature) => (
       (feature.properties?.layerId ?? fallbackLayerId) === layer.id
       && feature.geometry?.type === 'Point'
+      && feature.properties?.featureType !== 'text'
     ));
     if (pointFeatures.length === 0) continue;
 

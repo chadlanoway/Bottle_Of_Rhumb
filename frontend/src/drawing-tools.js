@@ -661,7 +661,7 @@ function minimumDistance(values, getDistance) {
   return distance;
 }
 
-export function setHiddenLayers(draw, map, hiddenLayerIds) {
+export function setHiddenLayers(draw, map, hiddenLayerIds, visualizationLayers = {}) {
   if (!draw || !map) return;
 
   const hidden = [
@@ -670,13 +670,17 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
     ['literal', hiddenLayerIds],
   ];
   const filter = ['!', hidden];
+  const geometryFilter = (type) => ['all', filter, ['!', [
+    'in', ['coalesce', ['get', 'layerId'], 'default-layer'],
+    ['literal', visualizationLayers[type] ?? []],
+  ]]];
 
   if (map.getLayer('td-linestring')) {
     map.setFilter('td-linestring', ['all', filter, solidFeatureFilter()]);
   }
-  if (map.getLayer('td-polygon')) map.setFilter('td-polygon', filter);
+  if (map.getLayer('td-polygon')) map.setFilter('td-polygon', geometryFilter('Polygon'));
   if (map.getLayer('td-polygon-outline')) {
-    map.setFilter('td-polygon-outline', ['all', filter, solidFeatureFilter()]);
+    map.setFilter('td-polygon-outline', ['all', geometryFilter('Polygon'), solidFeatureFilter()]);
   }
   for (const [layerId, geometryType] of [
     [FEATURE_GLOW_LINE, 'LineString'],
@@ -687,7 +691,7 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
       const defaultGlow = map.rhumbFeatureDefaults?.glowEnabled ?? false;
       map.setFilter(layerId, [
         'all',
-        filter,
+        geometryFilter(geometryType),
         ['==', ['coalesce', ['get', 'featureGlowEnabled'], defaultGlow], true],
         ['==', ['geometry-type'], geometryType],
       ]);
@@ -712,11 +716,11 @@ export function setHiddenLayers(draw, map, hiddenLayerIds) {
     [DOTTED_POLYGON_LAYER, 'Polygon', 'dotted'],
   ]) {
     if (map.getLayer(layerId)) {
-      map.setFilter(layerId, ['all', filter, ['==', ['geometry-type'], geometryType], ['==', ['get', 'featureDash'], dash]]);
+      map.setFilter(layerId, ['all', geometryFilter(geometryType), ['==', ['geometry-type'], geometryType], ['==', ['get', 'featureDash'], dash]]);
     }
   }
 
-  const pointFilter = ['all', filter, [
+  const pointFilter = ['all', geometryFilter('Point'), [
     'any',
     ['!=', ['get', 'featureType'], 'text'],
     ['==', ['get', 'selected'], true],
