@@ -494,7 +494,28 @@ select:focus-visible {
   }
 }
 
+.status-notice {
+  transition: opacity 250ms ease;
+}
+
+.status-notice.is-fading {
+  opacity: 0;
+}
+
+.status-notice-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-notice { transition: none; }
+}
+
 .routing-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   position: absolute;
   top: calc(100% + 8px);
   left: 50%;
@@ -2687,7 +2708,8 @@ button:disabled {
   animation: spin 1.6s linear infinite;
 }
 
-.data-import-status button {
+.data-import-status button,
+.routing-status button {
   width: 25px;
   height: 25px;
   padding: 0;

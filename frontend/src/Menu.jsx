@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FaGithub, FaUserCircle } from 'react-icons/fa';
+import StatusNotice from './StatusNotice.jsx';
 import {
   CHOROPLETH_RAMPS,
   buildChoroplethClasses,
@@ -193,6 +194,7 @@ export function EditorToolbar({
   onUseSearchAsRouteStart,
   routingActive,
   routingStatus,
+  setRoutingNotice,
   tutorialDrawMenuOpen = false,
 }) {
   const [drawMenuOpen, setDrawMenuOpen] = useState(false);
@@ -346,7 +348,9 @@ export function EditorToolbar({
         </button>
       )}
 
-      {routingStatus && <span className="routing-status" role="status">{routingStatus}</span>}
+      {routingStatus && <StatusNotice key={routingStatus} className="routing-status"
+        message={routingStatus} setStatus={setRoutingNotice}
+        duration={routingActive ? 0 : routingStatus.includes('harbor approach') ? 15000 : 6000} />}
 
       <div className="active-layer-status" title="New features will be added to this layer">
         <span>Drawing on</span>

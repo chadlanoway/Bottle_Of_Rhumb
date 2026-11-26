@@ -4,6 +4,7 @@ import FeatureEditor from './FeatureEditor.jsx';
 import Tutorial from './Tutorial.jsx';
 import DrawingContextMenu from './DrawingContextMenu.jsx';
 import CsvImportWizard from './CsvImportWizard.jsx';
+import StatusNotice from './StatusNotice.jsx';
 import {
   BASEMAPS,
   createMap,
@@ -651,7 +652,6 @@ export default function App() {
         setSelectedFeatureIds([routeId]);
       }
       setQuickRouteStatus('Route selected. Drag vertices or midpoint handles to adjust it.');
-      window.setTimeout(() => setQuickRouteStatus(''), 6000);
     } catch (caughtError) {
       setError(caughtError.message || 'The quick route could not be created.');
     }
@@ -758,7 +758,6 @@ export default function App() {
           `Water route added${Number.isFinite(kilometers) ? ` (${kilometers.toLocaleString()} km)` : ''}${cached ? ' from cache' : ''}. Drag its vertices to adjust it.`,
         );
       }
-      window.setTimeout(() => setWaterRouteStatus(''), requiresAdjustment ? 15000 : 9000);
     } catch (caughtError) {
       if (caughtError.name === 'AbortError') {
         setWaterRouteStatus('Water route cancelled.');
@@ -1027,7 +1026,10 @@ export default function App() {
       setSelectedFeatureIds([]);
       setFeatures(loaded.features);
       const geocoded = collection.importReport?.coordinateSource === 'geoapify';
-      const importMessage = geocoded
+      const featureCount = collection.features.length;
+      const importMessage = collection.importReport?.type !== 'csv'
+        ? `Added ${featureCount.toLocaleString()} ${featureCount === 1 ? 'feature' : 'features'} from ${file.name}.`
+        : geocoded
         ? `Added ${collection.importReport.importedRows.toLocaleString()} geocoded CSV rows.`
         : `Added ${collection.importReport?.importedRows?.toLocaleString() ?? collection.features.length.toLocaleString()} CSV rows.`;
       setDataImportStatus(importMessage);
@@ -1900,6 +1902,7 @@ export default function App() {
             onUseSearchAsRouteStart={handleUseSearchAsRouteStart}
             routingActive={routingActive || quickRouteActive || waterRouteActive || waterRouteLoading}
             routingStatus={waterRouteStatus || quickRouteStatus || routingStatus}
+            setRoutingNotice={waterRouteStatus ? setWaterRouteStatus : quickRouteStatus ? setQuickRouteStatus : setRoutingStatus}
             tutorialDrawMenuOpen={tutorialStep === 2 || tutorialStep === 4}
           />
         </>
@@ -2026,11 +2029,10 @@ export default function App() {
       )}
 
       {dataImportStatus && mapReady && !error && (
-        <div className="data-import-status" role="status">
+        <StatusNotice key={dataImportStatus} className="data-import-status" message={dataImportStatus}
+          setStatus={setDataImportStatus} duration={/^(Added|Unsaved map restored)\b/.test(dataImportStatus) ? 6000 : 0}>
           <span className="data-import-status-spinner" aria-hidden="true">⌖</span>
-          <span>{dataImportStatus}</span>
-          <button type="button" aria-label="Dismiss import status" onClick={() => setDataImportStatus('')}>×</button>
-        </div>
+        </StatusNotice>
       )}
 
       {error && (
